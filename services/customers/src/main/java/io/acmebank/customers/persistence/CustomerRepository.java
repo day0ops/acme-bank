@@ -15,9 +15,27 @@ public class CustomerRepository {
         this.jpaRepository = jpaRepository;
     }
 
+    /**
+     * Inserts a new customer when {@code customer.id()} is null; otherwise loads and mutates
+     * the managed entity so the update persists in place instead of inserting a duplicate row.
+     *
+     * @param customer the customer to insert or update
+     * @return the persisted customer, including its id
+     * @throws IllegalArgumentException if {@code customer.id()} is set but no such customer exists
+     */
     public Customer save(Customer customer) {
-        CustomerEntity entity = new CustomerEntity(
-                customer.firstName(), customer.lastName(), customer.email(), customer.dateOfBirth());
+        if (customer.id() == null) {
+            CustomerEntity entity = new CustomerEntity(
+                    customer.firstName(), customer.lastName(), customer.email(), customer.dateOfBirth());
+            CustomerEntity saved = jpaRepository.save(entity);
+            return toDomain(saved);
+        }
+
+        CustomerEntity entity = jpaRepository.findById(UUID.fromString(customer.id()))
+                .orElseThrow(() -> new IllegalArgumentException("customer " + customer.id() + " not found"));
+        entity.setFirstName(customer.firstName());
+        entity.setLastName(customer.lastName());
+        entity.setEmail(customer.email());
         CustomerEntity saved = jpaRepository.save(entity);
         return toDomain(saved);
     }

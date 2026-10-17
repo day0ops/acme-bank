@@ -35,6 +35,9 @@ class CustomerRepositoryTest {
     @Autowired
     private CustomerRepository repository;
 
+    @Autowired
+    private CustomerJpaRepository jpaRepository;
+
     @Test
     void save_thenFindById_roundTrips() {
         Customer created = Customer.create("Grace", "Hopper", "grace@example.com", LocalDate.of(1906, 12, 9));
@@ -51,5 +54,33 @@ class CustomerRepositoryTest {
     void findById_withUnknownId_returnsEmpty() {
         Optional<Customer> found = repository.findById("00000000-0000-0000-0000-000000000000");
         assertTrue(found.isEmpty());
+    }
+
+    @Test
+    void update_existingCustomer_updatesInPlace_notDuplicate() {
+        // Row count is asserted as a delta since the Testcontainers database is shared
+        // across test methods in this class with no reset between tests.
+        long countBefore = jpaRepository.count();
+        Customer created = Customer.create("Original", "Lovelace", "ada@example.com", LocalDate.of(1815, 12, 10));
+        Customer saved = repository.save(created);
+
+        Customer updated = new Customer(saved.id(), "Updated", saved.lastName(), saved.email(), saved.dateOfBirth());
+        Customer result = repository.save(updated);
+
+        assertEquals(saved.id(), result.id());
+        assertEquals(countBefore + 1, jpaRepository.count());
+        assertEquals("Updated", repository.findById(saved.id()).get().firstName());
+    }
+
+    @Test
+    void update_withUnchangedEmail_doesNotThrow() {
+        long countBefore = jpaRepository.count();
+        Customer created = Customer.create("Grace", "Hopper", "grace2@example.com", LocalDate.of(1906, 12, 9));
+        Customer saved = repository.save(created);
+
+        Customer updated = new Customer(saved.id(), saved.firstName(), "NewLastName", saved.email(), saved.dateOfBirth());
+
+        assertDoesNotThrow(() -> repository.save(updated));
+        assertEquals(countBefore + 1, jpaRepository.count());
     }
 }
