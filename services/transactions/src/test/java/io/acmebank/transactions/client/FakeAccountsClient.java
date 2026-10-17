@@ -1,6 +1,8 @@
 package io.acmebank.transactions.client;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 
 /** Records every debit/credit call; lets tests configure specific calls to fail. */
@@ -9,7 +11,7 @@ public class FakeAccountsClient implements AccountsClient {
     public record Call(String operation, String accountId, long amountMinorUnits, String idempotencyKey) {}
 
     public final List<Call> calls = new ArrayList<>();
-    private AccountsClientException creditFailure;
+    private final Deque<AccountsClientException> creditFailures = new ArrayDeque<>();
     private AccountsClientException debitFailure;
 
     /** The next {@link #debit} call throws {@code exception} instead of succeeding. */
@@ -17,9 +19,13 @@ public class FakeAccountsClient implements AccountsClient {
         this.debitFailure = exception;
     }
 
-    /** The next {@link #credit} call throws {@code exception} instead of succeeding. */
+    /**
+     * The next {@link #credit} call throws {@code exception} instead of succeeding. Can be called
+     * repeatedly to queue up failures for several consecutive credit calls in a row (e.g. the
+     * original credit and a subsequent compensating credit).
+     */
     public void failNextCreditWith(AccountsClientException exception) {
-        this.creditFailure = exception;
+        creditFailures.addLast(exception);
     }
 
     @Override
@@ -35,9 +41,8 @@ public class FakeAccountsClient implements AccountsClient {
     @Override
     public void credit(String accountId, String currencyCode, long amountMinorUnits, String idempotencyKey) throws AccountsClientException {
         calls.add(new Call("credit", accountId, amountMinorUnits, idempotencyKey));
-        if (creditFailure != null) {
-            AccountsClientException toThrow = creditFailure;
-            creditFailure = null;
+        AccountsClientException toThrow = creditFailures.pollFirst();
+        if (toThrow != null) {
             throw toThrow;
         }
     }
