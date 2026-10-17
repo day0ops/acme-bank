@@ -1,8 +1,7 @@
 # Helm's .Files.Get is restricted to the chart's own directory tree and
 # silently returns empty for paths outside it (verified: no error, just a
-# blank value) - so this reads a chart-local copy of the realm export rather
-# than the canonical platform/keycloak/realm-export.json directly. Keep the
-# two in sync; see platform/keycloak/README.md.
+# blank value) - so this reads files/realm-export.json, a symlink to the
+# canonical platform/keycloak/realm-export.json. See platform/keycloak/README.md.
 apiVersion: v1
 kind: ConfigMap
 metadata:
