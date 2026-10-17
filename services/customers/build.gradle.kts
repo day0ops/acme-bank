@@ -48,6 +48,7 @@ dependencies {
     testImplementation("org.testcontainers:postgresql:1.20.2")
     testImplementation("org.testcontainers:junit-jupiter:1.20.2")
     testImplementation("io.grpc:grpc-testing:$grpcVersion")
+    testImplementation("io.grpc:grpc-inprocess:$grpcVersion")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
