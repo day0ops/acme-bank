@@ -1,0 +1,34 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# Go
+/bin/
+*.test
+*.out
+
+# Java (Gradle/Maven)
+build/
+target/
+.gradle/
+*.class
+*.jar
+!**/gradle-wrapper.jar
+
+# Rust
+target/
+
+# Node / React
+node_modules/
+dist/
+.vite/
+
+# Local env
+.env
+.env.local
+*.pem
