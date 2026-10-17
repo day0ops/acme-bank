@@ -145,18 +145,47 @@ func TestRepository_UpdateBalance_ConcurrentDeltasDoNotLoseUpdates(t *testing.T)
 		t.Fatalf("Create() error = %v", err)
 	}
 
+	// Pre-warm the pool to 2 live connections. Otherwise, whichever goroutine
+	// doesn't reuse the connection from Create above pays a connection
+	// handshake that can take longer than this whole UpdateBalance call,
+	// serializing the two goroutines and masking the race being tested for.
+	conn1, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatalf("Acquire() error = %v", err)
+	}
+	conn2, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatalf("Acquire() error = %v", err)
+	}
+	conn1.Release()
+	conn2.Release()
+
+	// A start barrier forces both goroutines to call UpdateBalance at the
+	// same instant, maximizing the chance their transactions truly overlap
+	// instead of relying on scheduling luck.
+	var ready sync.WaitGroup
+	ready.Add(2)
+	start := make(chan struct{})
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 
 	var debitErr, creditErr error
 	go func() {
 		defer wg.Done()
+		ready.Done()
+		<-start
 		_, _, debitErr = repo.UpdateBalance(ctx, acct.ID, -1000, "concurrent-debit")
 	}()
 	go func() {
 		defer wg.Done()
+		ready.Done()
+		<-start
 		_, _, creditErr = repo.UpdateBalance(ctx, acct.ID, 500, "concurrent-credit")
 	}()
+
+	ready.Wait()
+	close(start)
 	wg.Wait()
 
 	if debitErr != nil {
