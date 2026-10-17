@@ -13,9 +13,10 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * Consumes {@code transactions.events} and applies the fraud/risk rule set to every
- * message on the topic. Transactions flagged by {@link FraudRule} are persisted and
- * republished on {@code fraud.events}.
+ * Consumes {@code transactions.events} and applies the fraud/risk rule set to
+ * {@code TransactionCompleted} messages only; a failed transfer never moved money, so there is
+ * nothing to flag. Transactions flagged by {@link FraudRule} are persisted and republished on
+ * {@code fraud.events}.
  */
 @Component
 public class TransactionEventConsumer {
@@ -32,6 +33,12 @@ public class TransactionEventConsumer {
 
     @KafkaListener(topics = "transactions.events", groupId = "fraud-risk")
     public void onMessage(ConsumerRecord<String, byte[]> record) throws InvalidProtocolBufferException {
+        var eventTypeHeader = record.headers().lastHeader("event-type");
+        String eventType = eventTypeHeader != null ? new String(eventTypeHeader.value()) : null;
+        if (!"TransactionCompleted".equals(eventType)) {
+            return;
+        }
+
         Transaction tx = Transaction.parseFrom(record.value());
         FraudRule.evaluate(tx.getAmount().getMinorUnits(), tx.getAmount().getCurrencyCode())
                 .ifPresent(reason -> {
