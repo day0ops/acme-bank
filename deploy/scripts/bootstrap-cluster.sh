@@ -13,7 +13,7 @@ if ! docker info >/dev/null 2>&1; then
   fi
 fi
 
-if ! kind get clusters | grep -q '^acme-bank$'; then
+if ! kubectl config get-contexts -o name | grep -q '^kind-acme-bank$'; then
   kind create cluster --config deploy/kind-config.yaml
 else
   echo "kind cluster 'acme-bank' already exists, reusing it"
