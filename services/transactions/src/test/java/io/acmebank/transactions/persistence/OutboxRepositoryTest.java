@@ -37,7 +37,7 @@ class OutboxRepositoryTest {
     void append_insertsRowWithUnpublishedState() {
         String aggregateId = "33333333-3333-3333-3333-333333333333";
 
-        outboxRepository.append("Transaction", aggregateId, "TransactionCompleted", "{\"id\":\"" + aggregateId + "\"}");
+        outboxRepository.append("Transaction", aggregateId, "TransactionCompleted", "hello".getBytes());
 
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM outbox_events WHERE aggregate_id = ?::uuid AND event_type = 'TransactionCompleted' AND published_at IS NULL",

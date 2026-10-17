@@ -68,6 +68,13 @@ class TransferSagaTest {
                 "SELECT COUNT(*) FROM outbox_events WHERE aggregate_id = ?::uuid AND event_type = 'TransactionCompleted'",
                 Integer.class, result.id());
         assertEquals(1, eventCount);
+
+        byte[] payload = jdbcTemplate.queryForObject(
+                "SELECT payload FROM outbox_events WHERE aggregate_id = ?::uuid AND event_type = 'TransactionCompleted'",
+                byte[].class, result.id());
+        var proto = io.acmebank.proto.transactions.v1.Transaction.parseFrom(payload);
+        assertEquals(result.id(), proto.getId());
+        assertEquals(io.acmebank.proto.transactions.v1.TransactionStatus.TRANSACTION_STATUS_COMPLETED, proto.getStatus());
     }
 
     @Test

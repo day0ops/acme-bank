@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS outbox_events (
     aggregate_type TEXT NOT NULL,
     aggregate_id   UUID NOT NULL,
     event_type     TEXT NOT NULL,
-    payload        JSONB NOT NULL,
+    payload        BYTEA NOT NULL,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     published_at   TIMESTAMPTZ
 );

@@ -34,6 +34,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    implementation("org.springframework.kafka:spring-kafka")
     implementation("org.postgresql:postgresql")
 
     // Pinned explicitly: grpc-protobuf transitively pulls an older protobuf-java
@@ -55,6 +56,9 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.testcontainers:postgresql:1.20.2")
     testImplementation("org.testcontainers:junit-jupiter:1.20.2")
+    // Dedicated Redpanda module (over the generic `org.testcontainers:kafka`) to match
+    // what's actually deployed (deploy/helm/redpanda), not just the wire-compatible API.
+    testImplementation("org.testcontainers:redpanda:1.20.2")
     testImplementation("io.grpc:grpc-testing:$grpcVersion")
     testImplementation("io.grpc:grpc-inprocess:$grpcVersion")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

@@ -1,13 +1,10 @@
 package io.acmebank.transactions.saga;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.acmebank.transactions.domain.Transaction;
 import io.acmebank.transactions.persistence.OutboxRepository;
 import io.acmebank.transactions.persistence.TransactionRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Map;
 
 /**
  * Persists a transfer's terminal outcome and its outbox event atomically.
@@ -21,7 +18,6 @@ public class TransferOutcomeRecorder {
 
     private final TransactionRepository transactionRepository;
     private final OutboxRepository outboxRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public TransferOutcomeRecorder(TransactionRepository transactionRepository, OutboxRepository outboxRepository) {
         this.transactionRepository = transactionRepository;
@@ -31,26 +27,36 @@ public class TransferOutcomeRecorder {
     @Transactional
     public Transaction markCompleted(Transaction transaction) {
         Transaction completed = transactionRepository.save(transaction.complete());
-        outboxRepository.append("Transaction", completed.id(), "TransactionCompleted", toJson(completed));
+        outboxRepository.append("Transaction", completed.id(), "TransactionCompleted", toProtoBytes(completed));
         return completed;
     }
 
     @Transactional
     public Transaction markFailed(Transaction transaction, String reason) {
         Transaction failed = transactionRepository.save(transaction.fail(reason));
-        outboxRepository.append("Transaction", failed.id(), "TransactionFailed", toJson(failed));
+        outboxRepository.append("Transaction", failed.id(), "TransactionFailed", toProtoBytes(failed));
         return failed;
     }
 
-    private String toJson(Transaction transaction) {
-        try {
-            return objectMapper.writeValueAsString(Map.of(
-                    "id", transaction.id(),
-                    "fromAccountId", transaction.fromAccountId(),
-                    "toAccountId", transaction.toAccountId(),
-                    "status", transaction.status().toString()));
-        } catch (Exception e) {
-            throw new IllegalStateException("failed to serialize outbox event payload", e);
-        }
+    private byte[] toProtoBytes(Transaction transaction) {
+        return io.acmebank.proto.transactions.v1.Transaction.newBuilder()
+                .setId(transaction.id())
+                .setFromAccountId(transaction.fromAccountId())
+                .setToAccountId(transaction.toAccountId())
+                .setAmount(io.acmebank.proto.common.v1.Money.newBuilder()
+                        .setCurrencyCode(transaction.currencyCode())
+                        .setMinorUnits(transaction.amountMinorUnits())
+                        .build())
+                .setStatus(toProtoStatus(transaction.status()))
+                .build()
+                .toByteArray();
+    }
+
+    private static io.acmebank.proto.transactions.v1.TransactionStatus toProtoStatus(io.acmebank.transactions.domain.TransactionStatus status) {
+        return switch (status) {
+            case PENDING -> io.acmebank.proto.transactions.v1.TransactionStatus.TRANSACTION_STATUS_PENDING;
+            case COMPLETED -> io.acmebank.proto.transactions.v1.TransactionStatus.TRANSACTION_STATUS_COMPLETED;
+            case FAILED -> io.acmebank.proto.transactions.v1.TransactionStatus.TRANSACTION_STATUS_FAILED;
+        };
     }
 }
