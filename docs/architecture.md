@@ -1,4 +1,4 @@
-# Acme Bank Platform Foundation — Design
+# Acme Bank Platform Foundation - Design
 
 ## Purpose
 
@@ -16,12 +16,12 @@ trace context does and doesn't propagate automatically.
 
 The full platform spans more independent pieces than fit in one spec:
 
-1. **Platform foundation** (this document) — service boundaries, languages,
+1. **Platform foundation** (this document) - service boundaries, languages,
    communication patterns, auth, gateway routing, data layer, observability,
    repo layout
-2. Core domain services — detailed implementation plans per service
-3. Frontend UI — detailed visual/implementation design
-4. Ambient mesh & platform ops — namespaces, waypoints, authorization
+2. Core domain services - detailed implementation plans per service
+3. Frontend UI - detailed visual/implementation design
+4. Ambient mesh & platform ops - namespaces, waypoints, authorization
    policies, mTLS detail (intentionally kept light here; expanded later)
 
 This document covers #1. Items #2-4 get their own implementation plans once
@@ -53,10 +53,10 @@ HTTP/2, plays well with ambient mesh's L7 processing).
 
 Two concrete call paths:
 
-1. **Dashboard BFF → Customers, Accounts, Transactions, Cards** — read-only
+1. **Dashboard BFF → Customers, Accounts, Transactions, Cards** - read-only
    fan-out to build the composite dashboard view. One UI request becomes
    4 parallel backend spans; this is the richest trace in the system.
-2. **Transactions (saga orchestrator) → Accounts** — a transfer is: debit
+2. **Transactions (saga orchestrator) → Accounts** - a transfer is: debit
    source account, credit destination account, write ledger entries. If the
    credit step fails, Transactions issues a compensating debit-reversal to the
    source account. Orchestrated (not choreographed), so there is one clear
@@ -69,7 +69,7 @@ the ledger write; a relay publishes it to Redpanda. Fraud/Risk and
 Notifications both consume it independently. Fraud/Risk may publish
 `TransactionFlagged`, which Notifications also consumes. Cards publishes
 `CardIssued`/`CardStatusChanged`, consumed by Notifications. No service calls
-Notifications or Fraud/Risk directly — they only react to events.
+Notifications or Fraud/Risk directly - they only react to events.
 
 Redpanda (not Kafka) was chosen for the broker: Kafka-API compatible, so
 client libraries and demo narrative are unchanged, but ships as a single
@@ -78,7 +78,7 @@ lightweight binary with no ZooKeeper/KRaft cluster to operate.
 ## Multi-tenancy & auth
 
 Single tenant: one bank, "Acme Bank." (Multi-tenancy was considered but
-dropped in favor of simplicity — see "Deferred" below.)
+dropped in favor of simplicity - see "Deferred" below.)
 
 **Roles** (three-tier RBAC):
 
@@ -88,7 +88,7 @@ dropped in favor of simplicity — see "Deferred" below.)
 | `banker` | Day-to-day teller operations: search/view any customer, onboard new customers, open accounts, process transfers/deposits on a customer's behalf, issue cards, freeze/unfreeze any card. No deletes, no managing other staff, no system config. |
 | `admin` | Everything a banker can do, plus: deactivate/delete customers and accounts, manage banker/admin user accounts, override fraud flags, full audit log access. |
 
-Modeled in Keycloak as composite roles — `admin` includes all `banker`
+Modeled in Keycloak as composite roles - `admin` includes all `banker`
 permissions.
 
 **IdP:** Keycloak, one realm (no realm-per-tenant, since there is only one
@@ -101,7 +101,7 @@ fine-grained checks themselves (e.g. "is this caller the account owner, or at
 least a banker?"). This sets up a layered-defense story: kgateway enforces
 authN/coarse authZ at the edge; an Istio `AuthorizationPolicy` in ambient mesh
 can additionally enforce east-west rules (e.g. only the Dashboard BFF may call
-Accounts' internal read endpoint) — full detail deferred to the ambient mesh
+Accounts' internal read endpoint) - full detail deferred to the ambient mesh
 sub-project.
 
 **Guest (unauthenticated) mode:** since this app doubles as a live demo tool,
@@ -129,7 +129,7 @@ guest access matters beyond a generic marketing page:
 `acme-bank` for domain services + UI, `acme-platform` for Keycloak, Redpanda,
 Postgres instances, and the observability stack. This is enough to
 demonstrate ambient's cross-namespace mTLS without expanding
-namespace/waypoint policy design into its own effort here — fine-grained
+namespace/waypoint policy design into its own effort here - fine-grained
 waypoint and `AuthorizationPolicy` choices belong to the later "ambient mesh
 & platform ops" sub-project.
 
@@ -145,7 +145,7 @@ waypoint and `AuthorizationPolicy` choices belong to the later "ambient mesh
 - **Mesh visualization:** Kiali, for the service graph.
 - **Async trace propagation:** sync calls (HTTP through kgateway, gRPC
   between services) get trace context propagated for free by the mesh. Async
-  calls over Redpanda do not — each publisher must inject the W3C
+  calls over Redpanda do not - each publisher must inject the W3C
   `traceparent` into message headers and each consumer must extract it, or
   the trace breaks at that hop. This is called out explicitly as a real
   distributed-tracing consideration, not just a mesh feature to demo.
@@ -176,7 +176,7 @@ acme-bank/
 
 Monorepo. Each service is self-contained with its own Dockerfile and native
 build tooling (Maven/Gradle, go.mod, Cargo.toml), but all share `proto/` for
-gRPC contracts **and** Redpanda event payload schemas — one IDL (Protobuf)
+gRPC contracts **and** Redpanda event payload schemas - one IDL (Protobuf)
 instead of separate REST DTOs, gRPC contracts, and event schemas drifting
 apart independently. Helm charts for deployment (per-service chart plus an
 umbrella chart to install everything together), so toggling optional pieces
@@ -204,7 +204,7 @@ architecture spec.
 
 - **Unit tests:** native per language (JUnit5 for Java, `go test` + testify
   for Go, built-in `#[test]` for Rust)
-- **Integration tests:** Testcontainers (Postgres + Redpanda) per service —
+- **Integration tests:** Testcontainers (Postgres + Redpanda) per service -
   real dependencies, not mocks, consistent across all three languages
 - **E2E:** a Playwright suite against the running stack, covering login as
   each role, account creation, a transfer (including a forced-failure case to
@@ -222,7 +222,7 @@ architecture spec.
   role-based access control instead. Revisit only if a specific demo needs
   tenant isolation.
 - **agentgateway / AI-agent feature:** considered as a second gateway for an
-  MCP-based assistant feature, explicitly deferred — no AI-agent feature is
+  MCP-based assistant feature, explicitly deferred - no AI-agent feature is
   in scope for this design.
 - **Realm-per-tenant Keycloak setup:** not needed given single-tenant scope.
 - **Fine-grained ambient mesh policy** (waypoints, `AuthorizationPolicy`
