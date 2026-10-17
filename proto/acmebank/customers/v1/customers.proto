@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package acmebank.customers.v1;
+
+option go_package = "example.com/acmebank/proto/gen/go/acmebank/customers/v1;customersv1";
+option java_package = "io.acmebank.proto.customers.v1";
+option java_multiple_files = true;
+
+message Customer {
+  string id = 1;
+  string first_name = 2;
+  string last_name = 3;
+  string email = 4;
+  string date_of_birth = 5; // ISO-8601 date, e.g. "1990-01-15"
+}
+
+message CreateCustomerRequest {
+  string first_name = 1;
+  string last_name = 2;
+  string email = 3;
+  string date_of_birth = 4;
+}
+
+message CreateCustomerResponse {
+  Customer customer = 1;
+}
+
+message GetCustomerRequest {
+  string id = 1;
+}
+
+message GetCustomerResponse {
+  Customer customer = 1;
+}
+
+message UpdateCustomerRequest {
+  string id = 1;
+  string first_name = 2;
+  string last_name = 3;
+  string email = 4;
+}
+
+message UpdateCustomerResponse {
+  Customer customer = 1;
+}
+
+service CustomersService {
+  rpc CreateCustomer(CreateCustomerRequest) returns (CreateCustomerResponse);
+  rpc GetCustomer(GetCustomerRequest) returns (GetCustomerResponse);
+  rpc UpdateCustomer(UpdateCustomerRequest) returns (UpdateCustomerResponse);
+}
