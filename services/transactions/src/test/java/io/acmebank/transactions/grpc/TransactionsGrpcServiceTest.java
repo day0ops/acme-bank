@@ -57,4 +57,26 @@ class TransactionsGrpcServiceTest {
 
         assertEquals(TransactionStatus.TRANSACTION_STATUS_COMPLETED, responseObserver.result.getTransaction().getStatus());
     }
+
+    @Test
+    void transfer_withSameFromAndToAccount_returnsInvalidArgument() {
+        TransferSaga saga = new TransferSaga(transactionRepository, new FakeAccountsClient(), outcomeRecorder);
+        TransactionsGrpcService service = new TransactionsGrpcService(saga, transactionRepository);
+
+        var responseObserver = new io.grpc.stub.StreamObserver<TransferResponse>() {
+            Throwable error;
+            @Override public void onNext(TransferResponse value) { fail("expected onError, got a result"); }
+            @Override public void onError(Throwable t) { error = t; }
+            @Override public void onCompleted() {}
+        };
+
+        service.transfer(TransferRequest.newBuilder()
+                .setFromAccountId("99999999-9999-9999-9999-999999999999")
+                .setToAccountId("99999999-9999-9999-9999-999999999999")
+                .setAmount(Money.newBuilder().setCurrencyCode("USD").setMinorUnits(2500).build())
+                .build(), responseObserver);
+
+        assertNotNull(responseObserver.error);
+        assertEquals(io.grpc.Status.Code.INVALID_ARGUMENT, io.grpc.Status.fromThrowable(responseObserver.error).getCode());
+    }
 }

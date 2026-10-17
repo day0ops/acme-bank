@@ -25,9 +25,15 @@ public class TransactionsGrpcService extends TransactionsServiceGrpc.Transaction
 
     @Override
     public void transfer(TransferRequest request, StreamObserver<TransferResponse> responseObserver) {
-        Transaction result = saga.execute(
-                request.getFromAccountId(), request.getToAccountId(),
-                request.getAmount().getCurrencyCode(), request.getAmount().getMinorUnits());
+        Transaction result;
+        try {
+            result = saga.execute(
+                    request.getFromAccountId(), request.getToAccountId(),
+                    request.getAmount().getCurrencyCode(), request.getAmount().getMinorUnits());
+        } catch (IllegalArgumentException invalid) {
+            responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(invalid.getMessage()).asRuntimeException());
+            return;
+        }
         responseObserver.onNext(TransferResponse.newBuilder().setTransaction(toProto(result)).build());
         responseObserver.onCompleted();
     }
