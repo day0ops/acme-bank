@@ -1,1 +1,18 @@
 @import "tailwindcss";
+
+/* Landing page palette ("three stones": a warm neutral ground, one step
+   darker for panels, charcoal ink, sage accent reserved for the one
+   primary action) and display type system, scoped by Tailwind's generated
+   utilities (bg-stone-bg, text-ink, font-display, etc). Kept separate from
+   the slate-based app chrome so dashboard/admin screens are unaffected. */
+@theme {
+  --color-stone-bg: #eeecea;
+  --color-stone-surface: #e4e1dd;
+  --color-stone-field: #cdc3b6;
+  --color-ink: #333231;
+  --color-muted: #55514c;
+  --color-accent: #5c6b54;
+  --color-accent-ink: #ffffff;
+
+  --font-display: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}

@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { App } from './App'
 
 describe('App', () => {
-  it('renders the Acme Bank landing placeholder at the root route', () => {
+  it('renders the real landing page at the root route', () => {
     render(<App />)
-    // Scoped to the heading role: "Acme Bank" also appears in the nav brand link.
-    expect(screen.getByRole('heading', { name: 'Acme Bank' })).toBeInTheDocument()
+    const heading = screen.getByRole('heading', { level: 1 })
+    expect(heading).toHaveTextContent('Banking with')
+    expect(heading).toHaveTextContent('the lights on.')
   })
 })

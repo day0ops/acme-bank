@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Scratch output from the design-taste-frontend skill (screenshots, reports)
+.taste-skill/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
