@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package acmebank.common.v1;
+
+option go_package = "example.com/acmebank/proto/gen/go/common/v1;commonv1";
+
+// Money represents a monetary amount using integer minor units
+// (e.g. cents) instead of a floating-point type, to avoid rounding
+// errors in financial calculations.
+message Money {
+  // ISO 4217 currency code, e.g. "USD".
+  string currency_code = 1;
+  // Amount in the currency's minor unit (e.g. cents for USD).
+  int64 minor_units = 2;
+}
