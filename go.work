@@ -1,3 +1,6 @@
-go 1.27
+go 1.27.0
 
-use ./proto/gen/go
+use (
+	./proto/gen/go
+	./services/accounts
+)

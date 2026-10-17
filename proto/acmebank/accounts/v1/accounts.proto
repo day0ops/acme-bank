@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package acmebank.accounts.v1;
+
+import "acmebank/common/v1/money.proto";
+
+option go_package = "example.com/acmebank/proto/gen/go/acmebank/accounts/v1;accountsv1";
+
+enum AccountType {
+  ACCOUNT_TYPE_UNSPECIFIED = 0;
+  ACCOUNT_TYPE_CHECKING = 1;
+  ACCOUNT_TYPE_SAVINGS = 2;
+}
+
+enum AccountStatus {
+  ACCOUNT_STATUS_UNSPECIFIED = 0;
+  ACCOUNT_STATUS_ACTIVE = 1;
+  ACCOUNT_STATUS_FROZEN = 2;
+  ACCOUNT_STATUS_CLOSED = 3;
+}
+
+message Account {
+  string id = 1;
+  string customer_id = 2;
+  AccountType type = 3;
+  AccountStatus status = 4;
+  acmebank.common.v1.Money balance = 5;
+}
+
+message CreateAccountRequest {
+  string customer_id = 1;
+  AccountType type = 2;
+  string currency_code = 3;
+}
+
+message CreateAccountResponse {
+  Account account = 1;
+}
+
+message GetAccountRequest {
+  string id = 1;
+}
+
+message GetAccountResponse {
+  Account account = 1;
+}
+
+message ListAccountsByCustomerRequest {
+  string customer_id = 1;
+}
+
+message ListAccountsByCustomerResponse {
+  repeated Account accounts = 1;
+}
+
+// Debit and Credit are idempotent: replaying the same idempotency_key for
+// the same account returns the previously-computed result without
+// re-applying the balance change.
+message DebitRequest {
+  string account_id = 1;
+  acmebank.common.v1.Money amount = 2;
+  string idempotency_key = 3;
+}
+
+message DebitResponse {
+  Account account = 1;
+}
+
+message CreditRequest {
+  string account_id = 1;
+  acmebank.common.v1.Money amount = 2;
+  string idempotency_key = 3;
+}
+
+message CreditResponse {
+  Account account = 1;
+}
+
+service AccountsService {
+  rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse);
+  rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
+  rpc ListAccountsByCustomer(ListAccountsByCustomerRequest) returns (ListAccountsByCustomerResponse);
+  rpc Debit(DebitRequest) returns (DebitResponse);
+  rpc Credit(CreditRequest) returns (CreditResponse);
+}
