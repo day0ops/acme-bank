@@ -1,5 +1,9 @@
 # Acme Bank
 
+[![CI](https://github.com/day0ops/acme-bank/actions/workflows/ci.yml/badge.svg)](https://github.com/day0ops/acme-bank/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/day0ops/acme-bank)](LICENSE)
+[![Go Version](https://img.shields.io/badge/go-1.27%2B-00ADD8)](go.work)
+
 A polyglot core-banking microservices demo built on Istio ambient mesh and
 kgateway. Full architecture: [docs/architecture.md](docs/architecture.md).
 
