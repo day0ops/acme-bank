@@ -79,9 +79,25 @@ export interface DashboardCustomer {
   email: string
 }
 
+// dashboard-bff/internal/restapi/dto.go accountResponse/cardResponse: narrower
+// than Account/Card above - the BFF's embedded DTOs omit customerId/accountId
+// entirely (same mismatch class as DashboardTransaction/DashboardCustomer).
+export interface DashboardAccount {
+  id: string
+  type: Account['type']
+  status: Account['status']
+  balance: Money
+}
+
+export interface DashboardCard {
+  id: string
+  lastFour: string
+  status: Card['status']
+}
+
 export interface AccountView {
-  account: Account
-  cards: Card[]
+  account: DashboardAccount
+  cards: DashboardCard[]
   recentTransactions: DashboardTransaction[]
 }
 
