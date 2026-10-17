@@ -747,7 +747,8 @@ const file_acmebank_accounts_v1_accounts_proto_rawDesc = "" +
 	"GetAccount\x12'.acmebank.accounts.v1.GetAccountRequest\x1a(.acmebank.accounts.v1.GetAccountResponse\x12\x83\x01\n" +
 	"\x16ListAccountsByCustomer\x123.acmebank.accounts.v1.ListAccountsByCustomerRequest\x1a4.acmebank.accounts.v1.ListAccountsByCustomerResponse\x12P\n" +
 	"\x05Debit\x12\".acmebank.accounts.v1.DebitRequest\x1a#.acmebank.accounts.v1.DebitResponse\x12S\n" +
-	"\x06Credit\x12#.acmebank.accounts.v1.CreditRequest\x1a$.acmebank.accounts.v1.CreditResponseBCZAexample.com/acmebank/proto/gen/go/acmebank/accounts/v1;accountsv1b\x06proto3"
+	"\x06Credit\x12#.acmebank.accounts.v1.CreditRequest\x1a$.acmebank.accounts.v1.CreditResponseBd\n" +
+	"\x1dio.acmebank.proto.accounts.v1P\x01ZAexample.com/acmebank/proto/gen/go/acmebank/accounts/v1;accountsv1b\x06proto3"
 
 var (
 	file_acmebank_accounts_v1_accounts_proto_rawDescOnce sync.Once
