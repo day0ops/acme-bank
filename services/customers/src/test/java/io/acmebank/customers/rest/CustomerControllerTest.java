@@ -1,22 +1,32 @@
 package io.acmebank.customers.rest;
 
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.interfaces.RSAPublicKey;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -42,19 +52,48 @@ class CustomerControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    // SecurityMockMvcRequestPostProcessors.jwt() bypasses SecurityConfig's JwtDecoder/
-    // JwtAuthenticationConverter beans entirely, so authorities must be supplied explicitly
-    // here to mirror what that converter grants for these realm roles.
-    private static RequestPostProcessor bankerJwt() {
-        return jwt()
-                .jwt(builder -> builder.claim("realm_access", Map.of("roles", List.of("banker", "admin"))))
-                .authorities(new SimpleGrantedAuthority("ROLE_banker"), new SimpleGrantedAuthority("ROLE_admin"));
+    private static final KeyPair TEST_KEY_PAIR;
+
+    static {
+        try {
+            KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+            generator.initialize(2048);
+            TEST_KEY_PAIR = generator.generateKeyPair();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    private static RequestPostProcessor customerJwt() {
-        return jwt()
-                .jwt(builder -> builder.claim("realm_access", Map.of("roles", List.of("customer"))))
-                .authorities(new SimpleGrantedAuthority("ROLE_customer"));
+    // Overrides the production JWKS-based JwtDecoder (which targets the unreachable
+    // jwk-set-uri from application.yml) so tokens signed with TEST_KEY_PAIR validate
+    // through the real SecurityConfig.jwtAuthenticationConverter() role-mapping logic.
+    @TestConfiguration
+    static class TestSecurityConfig {
+        @Bean
+        JwtDecoder jwtDecoder() {
+            return NimbusJwtDecoder.withPublicKey((RSAPublicKey) TEST_KEY_PAIR.getPublic()).build();
+        }
+    }
+
+    private static String signTestToken(List<String> roles) throws Exception {
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .subject("test-user-id")
+                .expirationTime(new Date(System.currentTimeMillis() + 3600_000))
+                .claim("realm_access", Map.of("roles", roles))
+                .build();
+        SignedJWT signedJWT = new SignedJWT(
+                new JWSHeader(JWSAlgorithm.RS256),
+                claims);
+        signedJWT.sign(new RSASSASigner(TEST_KEY_PAIR.getPrivate()));
+        return signedJWT.serialize();
+    }
+
+    private static String bankerToken() throws Exception {
+        return signTestToken(List.of("banker", "admin"));
+    }
+
+    private static String customerToken() throws Exception {
+        return signTestToken(List.of("customer"));
     }
 
     @Test
@@ -63,21 +102,25 @@ class CustomerControllerTest {
             {"firstName":"Margaret","lastName":"Hamilton","email":"margaret@example.com","dateOfBirth":"1936-08-17"}
             """;
 
-        String location = mockMvc.perform(post("/customers").with(bankerJwt()).contentType("application/json").content(createBody))
+        String location = mockMvc.perform(post("/customers")
+                        .header("Authorization", "Bearer " + bankerToken())
+                        .contentType("application/json").content(createBody))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.email").value("margaret@example.com"))
                 .andReturn().getResponse().getContentAsString();
 
         String id = com.jayway.jsonpath.JsonPath.read(location, "$.id");
 
-        mockMvc.perform(get("/customers/" + id).with(customerJwt()))
+        mockMvc.perform(get("/customers/" + id)
+                        .header("Authorization", "Bearer " + customerToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("margaret@example.com"));
     }
 
     @Test
     void getCustomer_withUnknownId_returnsProblemDetails() throws Exception {
-        mockMvc.perform(get("/customers/00000000-0000-0000-0000-000000000000").with(customerJwt()))
+        mockMvc.perform(get("/customers/00000000-0000-0000-0000-000000000000")
+                        .header("Authorization", "Bearer " + customerToken()))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentType("application/problem+json"))
                 .andExpect(jsonPath("$.status").value(404));
@@ -88,7 +131,9 @@ class CustomerControllerTest {
         String createBody = """
             {"firstName":"Ada","lastName":"Lovelace","email":"ada@example.com","dateOfBirth":"1815-12-10"}
             """;
-        String created = mockMvc.perform(post("/customers").with(bankerJwt()).contentType("application/json").content(createBody))
+        String created = mockMvc.perform(post("/customers")
+                        .header("Authorization", "Bearer " + bankerToken())
+                        .contentType("application/json").content(createBody))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         String id = com.jayway.jsonpath.JsonPath.read(created, "$.id");
@@ -96,12 +141,15 @@ class CustomerControllerTest {
         String updateBody = """
             {"firstName":"Augusta","lastName":"King","email":"augusta@example.com","dateOfBirth":"1815-12-10"}
             """;
-        mockMvc.perform(put("/customers/" + id).with(customerJwt()).contentType("application/json").content(updateBody))
+        mockMvc.perform(put("/customers/" + id)
+                        .header("Authorization", "Bearer " + customerToken())
+                        .contentType("application/json").content(updateBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id))
                 .andExpect(jsonPath("$.email").value("augusta@example.com"));
 
-        mockMvc.perform(get("/customers/" + id).with(customerJwt()))
+        mockMvc.perform(get("/customers/" + id)
+                        .header("Authorization", "Bearer " + customerToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.firstName").value("Augusta"));
     }
@@ -112,7 +160,9 @@ class CustomerControllerTest {
             {"firstName":"Jane","lastName":"Doe","email":"jane@example.com","dateOfBirth":"not-a-date"}
             """;
 
-        mockMvc.perform(post("/customers").with(bankerJwt()).contentType("application/json").content(createBody))
+        mockMvc.perform(post("/customers")
+                        .header("Authorization", "Bearer " + bankerToken())
+                        .contentType("application/json").content(createBody))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentType("application/problem+json"))
                 .andExpect(jsonPath("$.status").value(400));
@@ -120,7 +170,9 @@ class CustomerControllerTest {
 
     @Test
     void createCustomer_withMalformedJson_returnsProblemDetails() throws Exception {
-        mockMvc.perform(post("/customers").with(bankerJwt()).contentType("application/json").content("{not valid json"))
+        mockMvc.perform(post("/customers")
+                        .header("Authorization", "Bearer " + bankerToken())
+                        .contentType("application/json").content("{not valid json"))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentType("application/problem+json"))
                 .andExpect(jsonPath("$.status").value(400));
@@ -142,7 +194,9 @@ class CustomerControllerTest {
             {"firstName":"Wrong","lastName":"Role","email":"wrongrole@example.com","dateOfBirth":"1990-01-01"}
             """;
 
-        mockMvc.perform(post("/customers").with(customerJwt()).contentType("application/json").content(createBody))
+        mockMvc.perform(post("/customers")
+                        .header("Authorization", "Bearer " + customerToken())
+                        .contentType("application/json").content(createBody))
                 .andExpect(status().isForbidden());
     }
 }
