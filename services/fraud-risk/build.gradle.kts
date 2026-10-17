@@ -56,6 +56,11 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.testcontainers:postgresql:1.20.2")
     testImplementation("org.testcontainers:junit-jupiter:1.20.2")
+    // Dedicated Redpanda module (over the generic `org.testcontainers:kafka`) to match
+    // what's actually deployed (deploy/helm/redpanda), not just the wire-compatible API -
+    // same rationale as Transactions' OutboxRelayTest.
+    testImplementation("org.testcontainers:redpanda:1.20.2")
+    testImplementation("org.awaitility:awaitility:4.2.2")
     testImplementation("io.grpc:grpc-testing:$grpcVersion")
     testImplementation("io.grpc:grpc-inprocess:$grpcVersion")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
