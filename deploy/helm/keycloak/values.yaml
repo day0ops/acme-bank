@@ -1,0 +1,5 @@
+image:
+  repository: quay.io/keycloak/keycloak
+  tag: "26.0.0"
+adminUser: admin
+adminPassword: admin
