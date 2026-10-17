@@ -7,4 +7,5 @@ env:
   databaseURL: "jdbc:postgresql://customers-postgres:5432/customers"
   databaseUser: "customers"
   databasePassword: "customers"
+  jwksUrl: "http://keycloak.acme-platform.svc.cluster.local:8080/realms/acme-bank/protocol/openid-connect/certs"
   otelExporterEndpoint: "otel-collector.acme-platform.svc.cluster.local:4317"

@@ -25,5 +25,7 @@ spec:
           env:
             - name: DATABASE_URL
               value: {{ .Values.env.databaseURL | quote }}
+            - name: JWKS_URL
+              value: {{ .Values.env.jwksUrl | quote }}
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: {{ .Values.env.otelExporterEndpoint | quote }}

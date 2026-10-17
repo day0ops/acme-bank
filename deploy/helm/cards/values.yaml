@@ -5,4 +5,5 @@ image:
 replicaCount: 1
 env:
   databaseURL: "postgres://cards:cards@cards-postgres:5432/cards"
+  jwksUrl: "http://keycloak.acme-platform.svc.cluster.local:8080/realms/acme-bank/protocol/openid-connect/certs"
   otelExporterEndpoint: "http://otel-collector.acme-platform.svc.cluster.local:4317"
