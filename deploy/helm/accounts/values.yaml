@@ -1,3 +1,4 @@
+# built via: docker build -f services/accounts/Dockerfile . (run from repo root)
 image:
   repository: acme-bank/accounts
   tag: latest
