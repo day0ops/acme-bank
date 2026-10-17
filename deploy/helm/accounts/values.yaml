@@ -1,0 +1,7 @@
+image:
+  repository: acme-bank/accounts
+  tag: latest
+replicaCount: 1
+env:
+  databaseURL: "postgres://accounts:accounts@accounts-postgres:5432/accounts?sslmode=disable"
+  otelExporterEndpoint: "otel-collector.acme-platform.svc.cluster.local:4317"
