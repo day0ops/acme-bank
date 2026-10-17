@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: customers
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/customers}
+    username: ${DATABASE_USER:customers}
+    password: ${DATABASE_PASSWORD:customers}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  sql:
+    init:
+      mode: always
+
+server:
+  port: 8080
+
+grpc:
+  port: 9090
+
+otel:
+  exporter:
+    endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:localhost:4317}
