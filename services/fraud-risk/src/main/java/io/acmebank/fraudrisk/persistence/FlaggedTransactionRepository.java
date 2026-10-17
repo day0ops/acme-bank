@@ -16,6 +16,13 @@ public class FlaggedTransactionRepository {
         this.jpaRepository = jpaRepository;
     }
 
+    /**
+     * Persists a new flag record. Always inserts — flagged transactions are
+     * never updated in place, each flag event is its own row.
+     *
+     * @param flagged the flag to persist (its {@code id()} is ignored; the database generates one)
+     * @return the persisted flag, with its generated id populated
+     */
     public FlaggedTransaction save(FlaggedTransaction flagged) {
         FlaggedTransactionEntity entity = new FlaggedTransactionEntity(
                 UUID.fromString(flagged.transactionId()), flagged.reason(), flagged.currencyCode(), flagged.amountMinorUnits());
@@ -23,6 +30,9 @@ public class FlaggedTransactionRepository {
         return toDomain(saved);
     }
 
+    /**
+     * @return every flagged transaction on record, in no particular guaranteed order
+     */
     public List<FlaggedTransaction> findAll() {
         return jpaRepository.findAll().stream().map(FlaggedTransactionRepository::toDomain).collect(Collectors.toList());
     }
