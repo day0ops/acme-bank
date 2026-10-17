@@ -1,0 +1,10 @@
+# built via: docker build -f services/customers/Dockerfile . (run from repo root)
+image:
+  repository: acme-bank/customers
+  tag: latest
+replicaCount: 1
+env:
+  databaseURL: "jdbc:postgresql://customers-postgres:5432/customers"
+  databaseUser: "customers"
+  databasePassword: "customers"
+  otelExporterEndpoint: "otel-collector.acme-platform.svc.cluster.local:4317"

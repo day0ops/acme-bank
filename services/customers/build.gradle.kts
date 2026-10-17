@@ -23,7 +23,11 @@ repositories {
 
 val grpcVersion = "1.68.1"
 val protobufVersion = "4.28.2"
-val otelVersion = "1.41.0"
+// Pinned to match the version Spring Boot 3.3.4's dependency-management plugin enforces
+// for OTel's own transitive modules; declaring a newer version here only mismatches the
+// top-level jar against BOM-pinned transitives (e.g. opentelemetry-exporter-otlp-common),
+// producing a NoClassDefFoundError at runtime.
+val otelVersion = "1.37.0"
 val otelInstrumentationVersion = "2.7.0"
 
 dependencies {
@@ -43,6 +47,9 @@ dependencies {
     implementation("io.opentelemetry:opentelemetry-sdk:$otelVersion")
     implementation("io.opentelemetry:opentelemetry-exporter-otlp:$otelVersion")
     implementation("io.opentelemetry.instrumentation:opentelemetry-grpc-1.6:$otelInstrumentationVersion-alpha")
+    // Used directly for ResourceAttributes; otherwise only a transitive dependency of the
+    // instrumentation artifact above, so pin it explicitly rather than relying on that.
+    implementation("io.opentelemetry.semconv:opentelemetry-semconv:1.25.0-alpha")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.testcontainers:postgresql:1.20.2")
@@ -84,4 +91,10 @@ application {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+// The plain jar (from the `application` plugin) duplicates the Spring Boot executable jar
+// and makes `build/libs/*.jar` ambiguous for Docker's COPY; disable it since nothing consumes it.
+tasks.named<Jar>("jar") {
+    enabled = false
 }

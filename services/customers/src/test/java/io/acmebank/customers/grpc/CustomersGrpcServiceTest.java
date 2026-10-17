@@ -18,7 +18,10 @@ import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
+// grpc.port=0 binds an OS-assigned ephemeral port so each @SpringBootTest context (cached
+// independently per test class because of @DynamicPropertySource) can start its own
+// GrpcServerLifecycle without port 9090 colliding across concurrently cached contexts.
+@SpringBootTest(properties = "grpc.port=0")
 @Testcontainers
 class CustomersGrpcServiceTest {
 
