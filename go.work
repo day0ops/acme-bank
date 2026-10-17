@@ -3,4 +3,5 @@ go 1.27
 use (
 	./proto/gen/go
 	./services/accounts
+	./services/dashboard-bff
 )
