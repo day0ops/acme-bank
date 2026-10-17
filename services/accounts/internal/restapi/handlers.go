@@ -35,7 +35,7 @@ func NewMux(server accountsv1.AccountsServiceServer) *http.ServeMux {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(resp.Account)
+		_ = json.NewEncoder(w).Encode(toAccountResponse(resp.Account))
 	})
 
 	mux.HandleFunc("GET /accounts/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +45,7 @@ func NewMux(server accountsv1.AccountsServiceServer) *http.ServeMux {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp.Account)
+		_ = json.NewEncoder(w).Encode(toAccountResponse(resp.Account))
 	})
 
 	mux.HandleFunc("GET /accounts", func(w http.ResponseWriter, r *http.Request) {
@@ -61,8 +61,12 @@ func NewMux(server accountsv1.AccountsServiceServer) *http.ServeMux {
 			writeGRPCError(w, err)
 			return
 		}
+		accounts := []accountResponse{}
+		for _, a := range resp.Accounts {
+			accounts = append(accounts, toAccountResponse(a))
+		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp.Accounts)
+		_ = json.NewEncoder(w).Encode(accounts)
 	})
 
 	return mux

@@ -29,6 +29,9 @@ func NewServer(repo *postgres.Repository) *Server {
 
 // CreateAccount creates a new account with a zero balance in req.CurrencyCode.
 func (s *Server) CreateAccount(ctx context.Context, req *accountsv1.CreateAccountRequest) (*accountsv1.CreateAccountResponse, error) {
+	if req.Type != accountsv1.AccountType_ACCOUNT_TYPE_CHECKING && req.Type != accountsv1.AccountType_ACCOUNT_TYPE_SAVINGS {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid account type: %v", req.Type)
+	}
 	acct := &domain.Account{
 		CustomerID: req.CustomerId,
 		Type:       domain.AccountType(req.Type - 1),

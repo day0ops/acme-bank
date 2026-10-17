@@ -39,7 +39,9 @@ func writeGRPCError(w http.ResponseWriter, err error) {
 	switch st.Code() {
 	case codes.NotFound:
 		writeProblem(w, http.StatusNotFound, "Not Found", st.Message())
-	case codes.FailedPrecondition, codes.InvalidArgument:
+	case codes.InvalidArgument:
+		writeProblem(w, http.StatusBadRequest, "Bad Request", st.Message())
+	case codes.FailedPrecondition:
 		writeProblem(w, http.StatusUnprocessableEntity, "Unprocessable Entity", st.Message())
 	default:
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error", st.Message())
