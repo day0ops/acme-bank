@@ -1,5 +1,5 @@
 # Build from the repo root: docker build -f services/cards/Dockerfile .
-FROM rust:1.90-slim AS build
+FROM rust:1.90-slim-bookworm AS build
 RUN apt-get update && apt-get install -y protobuf-compiler && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY proto ./proto
