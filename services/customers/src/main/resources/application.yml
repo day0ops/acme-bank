@@ -1,6 +1,9 @@
 spring:
   application:
     name: customers
+  mvc:
+    problemdetails:
+      enabled: true
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/customers}
     username: ${DATABASE_USER:customers}
