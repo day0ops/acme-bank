@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package acmebank.transactions.v1;
+
+import "acmebank/common/v1/money.proto";
+
+option go_package = "example.com/acmebank/proto/gen/go/acmebank/transactions/v1;transactionsv1";
+option java_package = "io.acmebank.proto.transactions.v1";
+option java_multiple_files = true;
+
+enum TransactionStatus {
+  TRANSACTION_STATUS_UNSPECIFIED = 0;
+  TRANSACTION_STATUS_PENDING = 1;
+  TRANSACTION_STATUS_COMPLETED = 2;
+  TRANSACTION_STATUS_FAILED = 3;
+}
+
+message Transaction {
+  string id = 1;
+  string from_account_id = 2;
+  string to_account_id = 3;
+  acmebank.common.v1.Money amount = 4;
+  TransactionStatus status = 5;
+  string failure_reason = 6;
+}
+
+message TransferRequest {
+  string from_account_id = 1;
+  string to_account_id = 2;
+  acmebank.common.v1.Money amount = 3;
+}
+
+message TransferResponse {
+  Transaction transaction = 1;
+}
+
+message GetTransactionRequest {
+  string id = 1;
+}
+
+message GetTransactionResponse {
+  Transaction transaction = 1;
+}
+
+message ListTransactionsByAccountRequest {
+  string account_id = 1;
+}
+
+message ListTransactionsByAccountResponse {
+  repeated Transaction transactions = 1;
+}
+
+service TransactionsService {
+  rpc Transfer(TransferRequest) returns (TransferResponse);
+  rpc GetTransaction(GetTransactionRequest) returns (GetTransactionResponse);
+  rpc ListTransactionsByAccount(ListTransactionsByAccountRequest) returns (ListTransactionsByAccountResponse);
+}
