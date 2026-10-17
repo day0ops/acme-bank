@@ -30,7 +30,10 @@ import java.util.Map;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
+// grpc.port=0 binds an OS-assigned ephemeral port so each @SpringBootTest context (cached
+// independently per test class because of @DynamicPropertySource) can start its own
+// GrpcServerLifecycle without port 9090 colliding across concurrently cached contexts.
+@SpringBootTest(properties = "grpc.port=0")
 @AutoConfigureMockMvc
 @Testcontainers
 class TransactionControllerTest {

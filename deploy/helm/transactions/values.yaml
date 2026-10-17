@@ -1,0 +1,14 @@
+# built via: docker build -f services/transactions/Dockerfile . (run from repo root)
+image:
+  repository: acme-bank/transactions
+  tag: latest
+replicaCount: 1
+env:
+  databaseURL: "jdbc:postgresql://transactions-postgres:5432/transactions"
+  databaseUser: "transactions"
+  databasePassword: "transactions"
+  accountsGrpcHost: "accounts.acme-bank.svc.cluster.local"
+  accountsGrpcPort: "9090"
+  kafkaBootstrapServers: "redpanda.acme-platform.svc.cluster.local:9092"
+  jwksUrl: "http://keycloak.acme-platform.svc.cluster.local:8080/realms/acme-bank/protocol/openid-connect/certs"
+  otelExporterEndpoint: "otel-collector.acme-platform.svc.cluster.local:4317"

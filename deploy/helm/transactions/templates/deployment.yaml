@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transactions
+  labels:
+    app: transactions
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: transactions
+  template:
+    metadata:
+      labels:
+        app: transactions
+    spec:
+      containers:
+        - name: transactions
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - containerPort: 8080
+              name: http
+            - containerPort: 9090
+              name: grpc
+          env:
+            - name: DATABASE_URL
+              value: {{ .Values.env.databaseURL | quote }}
+            - name: DATABASE_USER
+              value: {{ .Values.env.databaseUser | quote }}
+            - name: DATABASE_PASSWORD
+              value: {{ .Values.env.databasePassword | quote }}
+            - name: ACCOUNTS_GRPC_HOST
+              value: {{ .Values.env.accountsGrpcHost | quote }}
+            - name: ACCOUNTS_GRPC_PORT
+              value: {{ .Values.env.accountsGrpcPort | quote }}
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ .Values.env.kafkaBootstrapServers | quote }}
+            - name: JWKS_URL
+              value: {{ .Values.env.jwksUrl | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.env.otelExporterEndpoint | quote }}
