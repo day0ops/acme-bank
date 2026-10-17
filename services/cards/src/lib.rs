@@ -1,4 +1,5 @@
 pub mod domain;
+pub mod repository;
 
 pub mod proto {
     pub mod acmebank {
