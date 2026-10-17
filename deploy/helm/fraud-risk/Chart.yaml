@@ -1,0 +1,5 @@
+apiVersion: v2
+name: fraud-risk
+description: Fraud/Risk service for Acme Bank
+version: 0.1.0
+appVersion: "0.1.0"

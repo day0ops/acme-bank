@@ -1,6 +1,11 @@
 spring:
   application:
     name: fraud-risk
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${JWKS_URL:http://keycloak.acme-platform.svc.cluster.local:8080/realms/acme-bank/protocol/openid-connect/certs}
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/fraud_risk}
     username: ${DATABASE_USER:fraud_risk}
