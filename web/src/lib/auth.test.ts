@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { http, passthrough } from 'msw'
+import { beforeAll, describe, expect, it } from 'vitest'
+import { server } from '@/mocks/server'
 
 // This test requires Docker/podman and verifies Keycloak's actual token
 // endpoint accepts the realm/client configuration this app is built
@@ -8,7 +10,14 @@ import { describe, expect, it } from 'vitest'
 //
 // Requires a live Keycloak instance at localhost:18080 with the real realm
 // import (see web-task-2-report.md for the exact container command used).
+//
+// test-setup.ts's global MSW server runs with onUnhandledFrame: 'error' so
+// other tests catch accidental real-network calls; that turns this file's
+// deliberate real fetch into a hard failure unless it's explicitly declared
+// a handled (pass-through) request.
 describe('Keycloak realm configuration', () => {
+  beforeAll(() => server.use(http.post('http://localhost:18080/*', () => passthrough())))
+
   it('issues a token for the configured realm and client using the password grant', async () => {
     const response = await fetch('http://localhost:18080/realms/acme-bank/protocol/openid-connect/token', {
       method: 'POST',

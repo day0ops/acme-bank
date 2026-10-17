@@ -1,0 +1,5 @@
+# built via: docker build -f web/Dockerfile . (run from repo root)
+image:
+  repository: acme-bank/web
+  tag: latest
+replicaCount: 1

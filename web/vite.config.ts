@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
+import { configDefaults } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
@@ -22,5 +23,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: './src/test-setup.ts',
+    // Playwright owns e2e/ (its own test() with a different signature);
+    // Vitest must not try to collect those files too.
+    exclude: [...configDefaults.exclude, 'e2e/**'],
   },
 })

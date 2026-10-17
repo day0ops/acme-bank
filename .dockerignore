@@ -1,0 +1,9 @@
+# Keeps local build artifacts and installed deps out of every service's
+# Docker build context (all Dockerfiles build from the repo root).
+.git
+**/node_modules
+**/dist
+**/target
+**/build
+**/.gradle
+**/bin

@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from '@/hooks/useAuth'
 import { useNotifications } from '@/hooks/useNotifications'
 import { LandingPage } from '@/pages/LandingPage'
 import { SandboxDashboardPage } from '@/pages/SandboxDashboardPage'
+import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { BankerConsolePage } from '@/pages/BankerConsolePage'
 
@@ -41,7 +42,7 @@ export function App() {
             <Route element={<AppLayout />}>
               <Route path="/" element={<LandingPage />} />
               <Route path="/sandbox" element={<SandboxDashboardPage />} />
-              <Route path="/login" element={<Placeholder title="Login" />} />
+              <Route path="/login" element={<LoginPage />} />
               <Route
                 path="/dashboard"
                 element={
