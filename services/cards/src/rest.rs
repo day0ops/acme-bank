@@ -10,7 +10,6 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tonic::{Code, Request};
@@ -74,6 +73,67 @@ struct IssueCardBody {
     account_id: String,
 }
 
+/// REST representation of a Card. Mirrors the request JSON contract
+/// (camelCase keys, string enum value) so a client can round-trip a
+/// response back into a request body.
+#[derive(Serialize)]
+struct CardResponse {
+    id: String,
+    #[serde(rename = "accountId")]
+    account_id: String,
+    #[serde(rename = "lastFour")]
+    last_four: String,
+    status: String,
+}
+
+impl From<&crate::proto::acmebank::cards::v1::Card> for CardResponse {
+    fn from(card: &crate::proto::acmebank::cards::v1::Card) -> Self {
+        use crate::proto::acmebank::cards::v1::CardStatus;
+        let status = CardStatus::try_from(card.status)
+            .unwrap_or(CardStatus::Unspecified)
+            .as_str_name()
+            .to_string();
+        CardResponse {
+            id: card.id.clone(),
+            account_id: card.account_id.clone(),
+            last_four: card.last_four.clone(),
+            status,
+        }
+    }
+}
+
+/// Converts the `Option<Card>` carried by the proto response envelopes into
+/// a `CardResponse`. The gRPC service always populates `card` on success, so
+/// a `None` here indicates a server bug rather than a client error.
+fn into_card_response(card: Option<crate::proto::acmebank::cards::v1::Card>) -> CardResponse {
+    CardResponse::from(&card.expect("card response should always include a card"))
+}
+
+/// Extractor that behaves like `Json<T>` but reports deserialization
+/// failures as RFC 9457 Problem Details instead of axum's default
+/// `text/plain` rejection body.
+struct ProblemJson<T>(T);
+
+#[async_trait::async_trait]
+impl<T, S> axum::extract::FromRequest<S> for ProblemJson<T>
+where
+    T: serde::de::DeserializeOwned,
+    S: Send + Sync,
+{
+    type Rejection = Response;
+
+    async fn from_request(req: axum::extract::Request, state: &S) -> Result<Self, Self::Rejection> {
+        match Json::<T>::from_request(req, state).await {
+            Ok(Json(value)) => Ok(ProblemJson(value)),
+            Err(rejection) => Err(problem_response(
+                StatusCode::BAD_REQUEST,
+                "Bad Request",
+                rejection.body_text(),
+            )),
+        }
+    }
+}
+
 /// Wires the Cards REST API onto `service`, the same `CardsGrpcService`
 /// implementation the gRPC transport uses.
 pub fn router(service: Arc<CardsGrpcService>) -> Router {
@@ -87,7 +147,7 @@ pub fn router(service: Arc<CardsGrpcService>) -> Router {
 
 async fn create_card(
     State(service): State<Arc<CardsGrpcService>>,
-    Json(body): Json<IssueCardBody>,
+    ProblemJson(body): ProblemJson<IssueCardBody>,
 ) -> Response {
     match service
         .issue_card(Request::new(IssueCardRequest {
@@ -95,7 +155,11 @@ async fn create_card(
         }))
         .await
     {
-        Ok(resp) => (StatusCode::CREATED, Json(json!(resp.into_inner().card))).into_response(),
+        Ok(resp) => (
+            StatusCode::CREATED,
+            Json(into_card_response(resp.into_inner().card)),
+        )
+            .into_response(),
         Err(status) => status_to_problem(status),
     }
 }
@@ -105,7 +169,7 @@ async fn get_card(
     Path(id): Path<String>,
 ) -> Response {
     match service.get_card(Request::new(GetCardRequest { id })).await {
-        Ok(resp) => Json(json!(resp.into_inner().card)).into_response(),
+        Ok(resp) => Json(into_card_response(resp.into_inner().card)).into_response(),
         Err(status) => status_to_problem(status),
     }
 }
@@ -128,7 +192,14 @@ async fn list_cards(
         .list_cards_by_account(Request::new(ListCardsByAccountRequest { account_id }))
         .await
     {
-        Ok(resp) => Json(json!(resp.into_inner().cards)).into_response(),
+        Ok(resp) => Json(
+            resp.into_inner()
+                .cards
+                .iter()
+                .map(CardResponse::from)
+                .collect::<Vec<_>>(),
+        )
+        .into_response(),
         Err(status) => status_to_problem(status),
     }
 }
@@ -141,7 +212,7 @@ async fn freeze_card(
         .freeze_card(Request::new(FreezeCardRequest { id }))
         .await
     {
-        Ok(resp) => Json(json!(resp.into_inner().card)).into_response(),
+        Ok(resp) => Json(into_card_response(resp.into_inner().card)).into_response(),
         Err(status) => status_to_problem(status),
     }
 }
@@ -154,7 +225,7 @@ async fn unfreeze_card(
         .unfreeze_card(Request::new(UnfreezeCardRequest { id }))
         .await
     {
-        Ok(resp) => Json(json!(resp.into_inner().card)).into_response(),
+        Ok(resp) => Json(into_card_response(resp.into_inner().card)).into_response(),
         Err(status) => status_to_problem(status),
     }
 }
@@ -214,6 +285,9 @@ mod tests {
             .await
             .unwrap();
         let created: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(created["accountId"], "11111111-1111-1111-1111-111111111111");
+        assert_eq!(created["lastFour"].as_str().unwrap().len(), 4);
+        assert_eq!(created["status"], "CARD_STATUS_ACTIVE");
         let id = created["id"].as_str().unwrap();
 
         let get_response = app
@@ -331,7 +405,7 @@ mod tests {
             .await
             .unwrap();
         let frozen: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(frozen["status"], 2);
+        assert_eq!(frozen["status"], "CARD_STATUS_FROZEN");
 
         let unfreeze_response = app
             .oneshot(
@@ -346,7 +420,7 @@ mod tests {
             .await
             .unwrap();
         let unfrozen: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(unfrozen["status"], 1);
+        assert_eq!(unfrozen["status"], "CARD_STATUS_ACTIVE");
     }
 
     #[tokio::test]
@@ -389,6 +463,27 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(
+            response.headers().get("content-type").unwrap(),
+            "application/problem+json"
+        );
+    }
+
+    #[tokio::test]
+    async fn create_card_with_malformed_json_returns_problem_details() {
+        let (_container, app, _pool) = setup().await;
+
+        let response = app
+            .oneshot(
+                HttpRequest::post("/cards")
+                    .header("content-type", "application/json")
+                    .body(Body::from("not json"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         assert_eq!(
             response.headers().get("content-type").unwrap(),
             "application/problem+json"
