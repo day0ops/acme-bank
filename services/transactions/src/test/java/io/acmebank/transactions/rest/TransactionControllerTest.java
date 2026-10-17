@@ -1,22 +1,32 @@
 package io.acmebank.transactions.rest;
 
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.interfaces.RSAPublicKey;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -39,18 +49,50 @@ class TransactionControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    // SecurityMockMvcRequestPostProcessors.jwt() bypasses SecurityConfig's JwtDecoder/
-    // JwtAuthenticationConverter beans entirely, so authorities must be supplied explicitly
-    // here to mirror what that converter grants for this realm role.
-    private static RequestPostProcessor customerJwt() {
-        return jwt()
-                .jwt(builder -> builder.claim("realm_access", Map.of("roles", List.of("customer"))))
-                .authorities(new SimpleGrantedAuthority("ROLE_customer"));
+    private static final KeyPair TEST_KEY_PAIR;
+
+    static {
+        try {
+            KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+            generator.initialize(2048);
+            TEST_KEY_PAIR = generator.generateKeyPair();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // Overrides the production JWKS-based JwtDecoder (which targets the unreachable
+    // jwk-set-uri from application.yml) so tokens signed with TEST_KEY_PAIR validate
+    // through the real SecurityConfig.jwtAuthenticationConverter() role-mapping logic.
+    @TestConfiguration
+    static class TestSecurityConfig {
+        @Bean
+        JwtDecoder jwtDecoder() {
+            return NimbusJwtDecoder.withPublicKey((RSAPublicKey) TEST_KEY_PAIR.getPublic()).build();
+        }
+    }
+
+    private static String signTestToken(List<String> roles) throws Exception {
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .subject("test-user-id")
+                .expirationTime(new Date(System.currentTimeMillis() + 3600_000))
+                .claim("realm_access", Map.of("roles", roles))
+                .build();
+        SignedJWT signedJWT = new SignedJWT(
+                new JWSHeader(JWSAlgorithm.RS256),
+                claims);
+        signedJWT.sign(new RSASSASigner(TEST_KEY_PAIR.getPrivate()));
+        return signedJWT.serialize();
+    }
+
+    private static String customerToken() throws Exception {
+        return signTestToken(List.of("customer"));
     }
 
     @Test
     void getTransaction_withUnknownId_returnsProblemDetails() throws Exception {
-        mockMvc.perform(get("/transactions/00000000-0000-0000-0000-000000000000").with(customerJwt()))
+        mockMvc.perform(get("/transactions/00000000-0000-0000-0000-000000000000")
+                        .header("Authorization", "Bearer " + customerToken()))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentType("application/problem+json"));
     }
