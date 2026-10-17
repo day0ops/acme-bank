@@ -11,9 +11,17 @@ pub struct NotificationStore {
     notifications: Mutex<VecDeque<Notification>>,
 }
 
+impl Default for NotificationStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NotificationStore {
     pub fn new() -> Self {
-        Self { notifications: Mutex::new(VecDeque::with_capacity(MAX_NOTIFICATIONS)) }
+        Self {
+            notifications: Mutex::new(VecDeque::with_capacity(MAX_NOTIFICATIONS)),
+        }
     }
 
     pub fn push(&self, notification: Notification) {
@@ -36,7 +44,11 @@ mod tests {
     #[test]
     fn push_then_recent_returns_pushed_notification() {
         let store = NotificationStore::new();
-        store.push(Notification::new("TransactionCompleted", "tx-1", "Transfer completed".to_string()));
+        store.push(Notification::new(
+            "TransactionCompleted",
+            "tx-1",
+            "Transfer completed".to_string(),
+        ));
 
         let recent = store.recent();
 
@@ -48,7 +60,11 @@ mod tests {
     fn push_beyond_capacity_evicts_oldest() {
         let store = NotificationStore::new();
         for i in 0..150 {
-            store.push(Notification::new("TransactionCompleted", &format!("tx-{i}"), "msg".to_string()));
+            store.push(Notification::new(
+                "TransactionCompleted",
+                &format!("tx-{i}"),
+                "msg".to_string(),
+            ));
         }
 
         let recent = store.recent();

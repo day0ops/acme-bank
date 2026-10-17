@@ -46,14 +46,22 @@ fn decode_notification(topic: &str, payload: &[u8]) -> Option<Notification> {
             // `status` is a raw i32 on the wire (proto3 enum encoding); convert it
             // back to the enum so the notification text reads e.g. "Completed"
             // rather than the numeric discriminant.
-            let status = TransactionStatus::try_from(tx.status).unwrap_or(TransactionStatus::Unspecified);
+            let status =
+                TransactionStatus::try_from(tx.status).unwrap_or(TransactionStatus::Unspecified);
             let message = format!("Transaction {} is now {:?}", tx.id, status);
             Some(Notification::new("TransactionUpdate", &tx.id, message))
         }
         "fraud.events" => {
             let event = TransactionFlaggedEvent::decode(payload).ok()?;
-            let message = format!("Transaction {} flagged: {}", event.transaction_id, event.reason);
-            Some(Notification::new("TransactionFlagged", &event.transaction_id, message))
+            let message = format!(
+                "Transaction {} flagged: {}",
+                event.transaction_id, event.reason
+            );
+            Some(Notification::new(
+                "TransactionFlagged",
+                &event.transaction_id,
+                message,
+            ))
         }
         _ => None,
     }

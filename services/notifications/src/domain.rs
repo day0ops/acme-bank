@@ -1,4 +1,5 @@
 #[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Notification {
     pub id: String,
     pub event_type: String,
