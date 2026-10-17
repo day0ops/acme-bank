@@ -96,9 +96,17 @@ impl CardsService for CardsGrpcService {
         request: Request<FreezeCardRequest>,
     ) -> Result<Response<FreezeCardResponse>, Status> {
         let req = request.into_inner();
+        let mut card = self
+            .repository
+            .get(&self.pool, &req.id)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?
+            .ok_or_else(|| Status::not_found(format!("card {} not found", req.id)))?;
+        card.freeze()
+            .map_err(|e| Status::failed_precondition(e.to_string()))?;
         let updated = self
             .repository
-            .update_status(&self.pool, &req.id, DomainCardStatus::Frozen)
+            .update_status(&self.pool, &req.id, card.status.clone())
             .await
             .map_err(|e| Status::internal(e.to_string()))?
             .ok_or_else(|| Status::not_found(format!("card {} not found", req.id)))?;
@@ -112,9 +120,17 @@ impl CardsService for CardsGrpcService {
         request: Request<UnfreezeCardRequest>,
     ) -> Result<Response<UnfreezeCardResponse>, Status> {
         let req = request.into_inner();
+        let mut card = self
+            .repository
+            .get(&self.pool, &req.id)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?
+            .ok_or_else(|| Status::not_found(format!("card {} not found", req.id)))?;
+        card.unfreeze()
+            .map_err(|e| Status::failed_precondition(e.to_string()))?;
         let updated = self
             .repository
-            .update_status(&self.pool, &req.id, DomainCardStatus::Active)
+            .update_status(&self.pool, &req.id, card.status.clone())
             .await
             .map_err(|e| Status::internal(e.to_string()))?
             .ok_or_else(|| Status::not_found(format!("card {} not found", req.id)))?;
@@ -215,5 +231,75 @@ mod tests {
             .unwrap()
             .into_inner();
         assert_eq!(unfrozen.card.unwrap().status, CardStatus::Active as i32);
+    }
+
+    #[tokio::test]
+    async fn freeze_closed_card_fails_with_failed_precondition() {
+        let (_container, service) = setup().await;
+
+        let issued = service
+            .issue_card(Request::new(IssueCardRequest {
+                account_id: "11111111-1111-1111-1111-111111111111".to_string(),
+            }))
+            .await
+            .unwrap()
+            .into_inner();
+        let id = issued.card.unwrap().id;
+
+        // Simulate a future close operation directly via the repository,
+        // bypassing the (not-yet-implemented) close RPC.
+        service
+            .repository
+            .update_status(&service.pool, &id, DomainCardStatus::Closed)
+            .await
+            .unwrap();
+
+        let result = service
+            .freeze_card(Request::new(FreezeCardRequest { id: id.clone() }))
+            .await;
+        assert_eq!(result.unwrap_err().code(), tonic::Code::FailedPrecondition);
+
+        let fetched = service
+            .repository
+            .get(&service.pool, &id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(fetched.status, DomainCardStatus::Closed);
+    }
+
+    #[tokio::test]
+    async fn unfreeze_closed_card_fails_with_failed_precondition() {
+        let (_container, service) = setup().await;
+
+        let issued = service
+            .issue_card(Request::new(IssueCardRequest {
+                account_id: "11111111-1111-1111-1111-111111111111".to_string(),
+            }))
+            .await
+            .unwrap()
+            .into_inner();
+        let id = issued.card.unwrap().id;
+
+        // Simulate a future close operation directly via the repository,
+        // bypassing the (not-yet-implemented) close RPC.
+        service
+            .repository
+            .update_status(&service.pool, &id, DomainCardStatus::Closed)
+            .await
+            .unwrap();
+
+        let result = service
+            .unfreeze_card(Request::new(UnfreezeCardRequest { id: id.clone() }))
+            .await;
+        assert_eq!(result.unwrap_err().code(), tonic::Code::FailedPrecondition);
+
+        let fetched = service
+            .repository
+            .get(&service.pool, &id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(fetched.status, DomainCardStatus::Closed);
     }
 }
