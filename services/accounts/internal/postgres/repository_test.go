@@ -2,6 +2,8 @@ package postgres_test
 
 import (
 	"context"
+	"errors"
+	"sync"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -105,7 +107,7 @@ func TestRepository_UpdateBalance_IdempotentReplay(t *testing.T) {
 		t.Fatalf("Create() error = %v", err)
 	}
 
-	updated, replayed, err := repo.UpdateBalance(ctx, acct.ID, 700, "key-1")
+	updated, replayed, err := repo.UpdateBalance(ctx, acct.ID, -300, "key-1")
 	if err != nil {
 		t.Fatalf("UpdateBalance() error = %v", err)
 	}
@@ -116,7 +118,7 @@ func TestRepository_UpdateBalance_IdempotentReplay(t *testing.T) {
 		t.Fatalf("got balance %d, want 700", updated.Balance.MinorUnits)
 	}
 
-	updated2, replayed2, err := repo.UpdateBalance(ctx, acct.ID, 999999, "key-1")
+	updated2, replayed2, err := repo.UpdateBalance(ctx, acct.ID, -999999, "key-1")
 	if err != nil {
 		t.Fatalf("UpdateBalance() replay error = %v", err)
 	}
@@ -125,5 +127,79 @@ func TestRepository_UpdateBalance_IdempotentReplay(t *testing.T) {
 	}
 	if updated2.Balance.MinorUnits != 700 {
 		t.Fatalf("replay should return unchanged balance 700, got %d", updated2.Balance.MinorUnits)
+	}
+}
+
+func TestRepository_UpdateBalance_ConcurrentDeltasDoNotLoseUpdates(t *testing.T) {
+	pool := setupTestDB(t)
+	repo := postgres.NewRepository(pool)
+	ctx := context.Background()
+
+	acct := &domain.Account{
+		CustomerID: "11111111-1111-1111-1111-111111111111",
+		Type:       domain.CheckingAccount,
+		Status:     domain.StatusActive,
+		Balance:    &commonv1.Money{CurrencyCode: "USD", MinorUnits: 10000},
+	}
+	if err := repo.Create(ctx, acct); err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	var debitErr, creditErr error
+	go func() {
+		defer wg.Done()
+		_, _, debitErr = repo.UpdateBalance(ctx, acct.ID, -1000, "concurrent-debit")
+	}()
+	go func() {
+		defer wg.Done()
+		_, _, creditErr = repo.UpdateBalance(ctx, acct.ID, 500, "concurrent-credit")
+	}()
+	wg.Wait()
+
+	if debitErr != nil {
+		t.Fatalf("debit UpdateBalance() error = %v", debitErr)
+	}
+	if creditErr != nil {
+		t.Fatalf("credit UpdateBalance() error = %v", creditErr)
+	}
+
+	got, err := repo.Get(ctx, acct.ID)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if got.Balance.MinorUnits != 9500 {
+		t.Fatalf("got balance %d, want 9500 (neither update should be lost)", got.Balance.MinorUnits)
+	}
+}
+
+func TestRepository_UpdateBalance_InsufficientFunds(t *testing.T) {
+	pool := setupTestDB(t)
+	repo := postgres.NewRepository(pool)
+	ctx := context.Background()
+
+	acct := &domain.Account{
+		CustomerID: "11111111-1111-1111-1111-111111111111",
+		Type:       domain.CheckingAccount,
+		Status:     domain.StatusActive,
+		Balance:    &commonv1.Money{CurrencyCode: "USD", MinorUnits: 100},
+	}
+	if err := repo.Create(ctx, acct); err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+
+	_, _, err := repo.UpdateBalance(ctx, acct.ID, -500, "key-insufficient")
+	if !errors.Is(err, postgres.ErrInsufficientFunds) {
+		t.Fatalf("UpdateBalance() error = %v, want ErrInsufficientFunds", err)
+	}
+
+	got, err := repo.Get(ctx, acct.ID)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if got.Balance.MinorUnits != 100 {
+		t.Fatalf("got balance %d, want unchanged 100", got.Balance.MinorUnits)
 	}
 }

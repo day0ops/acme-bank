@@ -27,6 +27,10 @@ func SchemaSQL() (string, error) {
 // ErrNotFound is returned when a requested account does not exist.
 var ErrNotFound = errors.New("account not found")
 
+// ErrInsufficientFunds is returned when applying a balance delta would make
+// an account's balance negative.
+var ErrInsufficientFunds = errors.New("insufficient funds")
+
 // Repository is a PostgreSQL-backed store for domain.Account.
 type Repository struct {
 	pool *pgxpool.Pool
@@ -75,11 +79,15 @@ func (r *Repository) ListByCustomer(ctx context.Context, customerID string) ([]*
 	return accounts, rows.Err()
 }
 
-// UpdateBalance sets accountID's balance to newBalanceMinorUnits, guarded by
-// idempotencyKey. If idempotencyKey has already been applied, the update is
-// skipped and the second return value is true, so retried requests (e.g.
-// Task 3's Debit/Credit RPCs) cannot double-apply a balance change.
-func (r *Repository) UpdateBalance(ctx context.Context, accountID string, newBalanceMinorUnits int64, idempotencyKey string) (*domain.Account, bool, error) {
+// UpdateBalance atomically applies deltaMinorUnits to accountID's balance
+// (negative for a debit, positive for a credit) and records idempotencyKey
+// so a replayed call is a no-op, so retried requests (e.g. Task 3's
+// Debit/Credit RPCs) cannot double-apply a balance change. The delta is
+// applied in a single UPDATE statement, so two concurrent calls against the
+// same account can never read-then-overwrite each other's result. Returns
+// ErrInsufficientFunds if applying a negative delta would make the balance
+// negative, or ErrNotFound if the account doesn't exist.
+func (r *Repository) UpdateBalance(ctx context.Context, accountID string, deltaMinorUnits int64, idempotencyKey string) (*domain.Account, bool, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return nil, false, err
@@ -98,18 +106,23 @@ func (r *Repository) UpdateBalance(ctx context.Context, accountID string, newBal
 		return nil, false, err
 	}
 
-	_, err = tx.Exec(ctx,
-		`UPDATE accounts SET balance_minor = $1, updated_at = now() WHERE id = $2`,
-		newBalanceMinorUnits, accountID)
-	if err != nil {
-		return nil, false, err
-	}
-
 	row := tx.QueryRow(ctx,
-		`SELECT id, customer_id, account_type, status, currency_code, balance_minor
-		 FROM accounts WHERE id = $1`, accountID)
+		`UPDATE accounts
+		 SET balance_minor = balance_minor + $1, updated_at = now()
+		 WHERE id = $2 AND balance_minor + $1 >= 0
+		 RETURNING id, customer_id, account_type, status, currency_code, balance_minor`,
+		deltaMinorUnits, accountID)
 	acct, err := scanAccount(row)
 	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			// The UPDATE matched zero rows: either the account doesn't exist,
+			// or it exists but applying the delta would make the balance
+			// negative. Disambiguate with an existence check.
+			if _, getErr := r.Get(ctx, accountID); getErr == nil {
+				return nil, false, ErrInsufficientFunds
+			}
+			return nil, false, ErrNotFound
+		}
 		return nil, false, err
 	}
 
