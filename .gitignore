@@ -32,3 +32,6 @@ dist/
 .env
 .env.local
 *.pem
+
+# Superpowers working docs
+docs/superpowers/
