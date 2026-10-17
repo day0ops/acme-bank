@@ -1,7 +1,10 @@
-.PHONY: help proto-lint proto-gen
+.PHONY: help tools proto-lint proto-gen
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+tools: ## Install pinned codegen tool versions
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
 
 proto-lint: ## Lint the shared Protobuf contracts
 	cd proto && buf lint
