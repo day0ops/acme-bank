@@ -1,3 +1,4 @@
+use crate::auth::{self, Verifier};
 use crate::grpc::CardsGrpcService;
 use crate::proto::acmebank::cards::v1::cards_service_server::CardsService as _;
 use crate::proto::acmebank::cards::v1::{
@@ -6,6 +7,7 @@ use crate::proto::acmebank::cards::v1::{
 };
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
+use axum::middleware;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -13,6 +15,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tonic::{Code, Request};
+
+/// Issuing a card is a banker/admin operation per the RBAC table.
+const BANKER_OR_ADMIN: &[&str] = &["banker", "admin"];
+/// Empty slice: `auth::require_role` treats this as "any authenticated
+/// caller" - a validated token is enough, no specific role is required.
+const ANY_AUTHENTICATED: &[&str] = &[];
 
 /// RFC 9457 Problem Details body.
 #[derive(Serialize)]
@@ -135,13 +143,26 @@ where
 }
 
 /// Wires the Cards REST API onto `service`, the same `CardsGrpcService`
-/// implementation the gRPC transport uses.
-pub fn router(service: Arc<CardsGrpcService>) -> Router {
+/// implementation the gRPC transport uses. Every route requires a valid
+/// Bearer JWT (checked via `verifier`); `POST /cards` additionally requires
+/// the `banker` or `admin` role.
+pub fn router(service: Arc<CardsGrpcService>, verifier: Arc<Verifier>) -> Router {
+    let cards_route = post(create_card)
+        .layer(middleware::from_fn(auth::require_role(
+            verifier.clone(),
+            BANKER_OR_ADMIN,
+        )))
+        .get(list_cards);
+
     Router::new()
-        .route("/cards", post(create_card).get(list_cards))
+        .route("/cards", cards_route)
         .route("/cards/:id", get(get_card))
         .route("/cards/:id/freeze", post(freeze_card))
         .route("/cards/:id/unfreeze", post(unfreeze_card))
+        .layer(middleware::from_fn(auth::require_role(
+            verifier,
+            ANY_AUTHENTICATED,
+        )))
         .with_state(service)
 }
 
@@ -233,6 +254,7 @@ async fn unfreeze_card(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::test_support::TestKeyPair;
     use crate::repository::Repository;
     use axum::body::Body;
     use axum::http::{Request as HttpRequest, StatusCode};
@@ -241,7 +263,17 @@ mod tests {
     use testcontainers_modules::postgres::Postgres;
     use tower::ServiceExt;
 
-    async fn setup() -> (testcontainers::ContainerAsync<Postgres>, Router, PgPool) {
+    /// Builds the router against a fresh Postgres container and a
+    /// `Verifier` backed by a locally-generated key pair. Returns the key
+    /// pair so each test can sign real RS256 JWTs (via `TestKeyPair::sign`)
+    /// that the router's real `Verifier`/middleware will actually validate -
+    /// no mock-authorities shortcut.
+    async fn setup() -> (
+        testcontainers::ContainerAsync<Postgres>,
+        Router,
+        PgPool,
+        TestKeyPair,
+    ) {
         // Module default is postgres:11-alpine, which predates the built-in
         // gen_random_uuid(); pin to 16-alpine to match the other services.
         let container = Postgres::default()
@@ -261,12 +293,18 @@ mod tests {
             .unwrap();
         let pool_for_test = pool.clone();
         let service = Arc::new(CardsGrpcService::new(pool, Repository));
-        (container, router(service), pool_for_test)
+        let keys = TestKeyPair::generate();
+        let verifier = Arc::new(Verifier::from_key(keys.decoding_key.clone()));
+        (container, router(service, verifier), pool_for_test, keys)
+    }
+
+    fn bearer(token: &str) -> String {
+        format!("Bearer {token}")
     }
 
     #[tokio::test]
     async fn create_then_get_card_round_trips() {
-        let (_container, app, _pool) = setup().await;
+        let (_container, app, _pool, keys) = setup().await;
 
         let create_body = r#"{"accountId":"11111111-1111-1111-1111-111111111111"}"#;
         let response = app
@@ -274,6 +312,7 @@ mod tests {
             .oneshot(
                 HttpRequest::post("/cards")
                     .header("content-type", "application/json")
+                    .header("authorization", bearer(&keys.sign(&["banker"])))
                     .body(Body::from(create_body))
                     .unwrap(),
             )
@@ -290,9 +329,13 @@ mod tests {
         assert_eq!(created["status"], "CARD_STATUS_ACTIVE");
         let id = created["id"].as_str().unwrap();
 
+        // A plain `customer` token is sufficient for a read - exercises the
+        // "any authenticated role" branch distinctly from the banker-only
+        // create above.
         let get_response = app
             .oneshot(
                 HttpRequest::get(format!("/cards/{id}"))
+                    .header("authorization", bearer(&keys.sign(&["customer"])))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -303,11 +346,12 @@ mod tests {
 
     #[tokio::test]
     async fn get_card_with_unknown_id_returns_problem_details() {
-        let (_container, app, _pool) = setup().await;
+        let (_container, app, _pool, keys) = setup().await;
 
         let response = app
             .oneshot(
                 HttpRequest::get("/cards/00000000-0000-0000-0000-000000000000")
+                    .header("authorization", bearer(&keys.sign(&["customer"])))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -323,13 +367,14 @@ mod tests {
 
     #[tokio::test]
     async fn list_cards_by_account_returns_created_card() {
-        let (_container, app, _pool) = setup().await;
+        let (_container, app, _pool, keys) = setup().await;
         let account_id = "11111111-1111-1111-1111-111111111111";
 
         app.clone()
             .oneshot(
                 HttpRequest::post("/cards")
                     .header("content-type", "application/json")
+                    .header("authorization", bearer(&keys.sign(&["banker"])))
                     .body(Body::from(format!(r#"{{"accountId":"{account_id}"}}"#)))
                     .unwrap(),
             )
@@ -339,6 +384,7 @@ mod tests {
         let response = app
             .oneshot(
                 HttpRequest::get(format!("/cards?accountId={account_id}"))
+                    .header("authorization", bearer(&keys.sign(&["customer"])))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -355,10 +401,15 @@ mod tests {
 
     #[tokio::test]
     async fn list_cards_without_account_id_returns_problem_details() {
-        let (_container, app, _pool) = setup().await;
+        let (_container, app, _pool, keys) = setup().await;
 
         let response = app
-            .oneshot(HttpRequest::get("/cards").body(Body::empty()).unwrap())
+            .oneshot(
+                HttpRequest::get("/cards")
+                    .header("authorization", bearer(&keys.sign(&["customer"])))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 
@@ -371,13 +422,14 @@ mod tests {
 
     #[tokio::test]
     async fn freeze_then_unfreeze_round_trips() {
-        let (_container, app, _pool) = setup().await;
+        let (_container, app, _pool, keys) = setup().await;
 
         let response = app
             .clone()
             .oneshot(
                 HttpRequest::post("/cards")
                     .header("content-type", "application/json")
+                    .header("authorization", bearer(&keys.sign(&["banker"])))
                     .body(Body::from(
                         r#"{"accountId":"11111111-1111-1111-1111-111111111111"}"#,
                     ))
@@ -391,10 +443,13 @@ mod tests {
         let created: serde_json::Value = serde_json::from_slice(&body).unwrap();
         let id = created["id"].as_str().unwrap().to_string();
 
+        // Freeze/unfreeze aren't role-restricted beyond "authenticated" -
+        // use a `customer` token to prove that's genuinely enough.
         let freeze_response = app
             .clone()
             .oneshot(
                 HttpRequest::post(format!("/cards/{id}/freeze"))
+                    .header("authorization", bearer(&keys.sign(&["customer"])))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -410,6 +465,7 @@ mod tests {
         let unfreeze_response = app
             .oneshot(
                 HttpRequest::post(format!("/cards/{id}/unfreeze"))
+                    .header("authorization", bearer(&keys.sign(&["customer"])))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -427,7 +483,7 @@ mod tests {
     async fn freeze_closed_card_returns_422_problem_details() {
         use crate::domain::CardStatus;
 
-        let (_container, app, pool) = setup().await;
+        let (_container, app, pool, keys) = setup().await;
 
         let create_body = r#"{"accountId":"11111111-1111-1111-1111-111111111111"}"#;
         let response = app
@@ -435,6 +491,7 @@ mod tests {
             .oneshot(
                 HttpRequest::post("/cards")
                     .header("content-type", "application/json")
+                    .header("authorization", bearer(&keys.sign(&["banker"])))
                     .body(Body::from(create_body))
                     .unwrap(),
             )
@@ -456,6 +513,7 @@ mod tests {
         let response = app
             .oneshot(
                 HttpRequest::post(format!("/cards/{id}/freeze"))
+                    .header("authorization", bearer(&keys.sign(&["customer"])))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -471,12 +529,13 @@ mod tests {
 
     #[tokio::test]
     async fn create_card_with_malformed_json_returns_problem_details() {
-        let (_container, app, _pool) = setup().await;
+        let (_container, app, _pool, keys) = setup().await;
 
         let response = app
             .oneshot(
                 HttpRequest::post("/cards")
                     .header("content-type", "application/json")
+                    .header("authorization", bearer(&keys.sign(&["banker"])))
                     .body(Body::from("not json"))
                     .unwrap(),
             )
@@ -488,5 +547,44 @@ mod tests {
             response.headers().get("content-type").unwrap(),
             "application/problem+json"
         );
+    }
+
+    #[tokio::test]
+    async fn create_card_without_token_returns_401() {
+        let (_container, app, _pool, _keys) = setup().await;
+
+        let response = app
+            .oneshot(
+                HttpRequest::post("/cards")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"accountId":"11111111-1111-1111-1111-111111111111"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn create_card_with_customer_role_returns_403() {
+        let (_container, app, _pool, keys) = setup().await;
+
+        let response = app
+            .oneshot(
+                HttpRequest::post("/cards")
+                    .header("content-type", "application/json")
+                    .header("authorization", bearer(&keys.sign(&["customer"])))
+                    .body(Body::from(
+                        r#"{"accountId":"11111111-1111-1111-1111-111111111111"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
     }
 }

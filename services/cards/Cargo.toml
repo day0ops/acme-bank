@@ -24,11 +24,14 @@ opentelemetry = "0.26"
 opentelemetry_sdk = { version = "0.26", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.26", features = ["grpc-tonic"] }
 tracing-opentelemetry = "0.27"
+jsonwebtoken = "9.3"
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
 
 [build-dependencies]
 tonic-build = "0.12"
 
 [dev-dependencies]
+rsa = "0.9"
 testcontainers = "0.23"
 testcontainers-modules = { version = "0.11", features = ["postgres"] }
 tower = "0.5"

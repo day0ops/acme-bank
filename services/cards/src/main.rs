@@ -1,9 +1,13 @@
+use cards::auth::Verifier;
 use cards::grpc::CardsGrpcService;
 use cards::proto::acmebank::cards::v1::cards_service_server::CardsServiceServer;
 use cards::repository::Repository;
 use cards::{rest, telemetry};
 use sqlx::PgPool;
 use std::sync::Arc;
+
+const DEFAULT_JWKS_URL: &str =
+    "http://keycloak.acme-platform.svc.cluster.local:8080/realms/acme-bank/protocol/openid-connect/certs";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,6 +23,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .execute(&pool)
         .await?;
 
+    let jwks_url = std::env::var("JWKS_URL").unwrap_or_else(|_| DEFAULT_JWKS_URL.to_string());
+    let verifier = Arc::new(Verifier::from_jwks_url(&jwks_url).await?);
+
     // Each transport gets its own service instance since the generated gRPC
     // server requires the bare type (not `Arc<T>`) while the REST router
     // needs `Arc<T>` to share state across axum handlers. Both share the
@@ -32,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_service(CardsServiceServer::new(grpc_service))
         .serve(grpc_addr);
 
-    let app = rest::router(rest_service);
+    let app = rest::router(rest_service, verifier);
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
     let http_server = axum::serve(listener, app);
 
