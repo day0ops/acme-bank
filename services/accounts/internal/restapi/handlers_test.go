@@ -1,16 +1,43 @@
 package restapi_test
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+
+	"example.com/acmebank/services/accounts/internal/auth"
 	"example.com/acmebank/services/accounts/internal/grpcapi"
 	"example.com/acmebank/services/accounts/internal/postgres"
 	"example.com/acmebank/services/accounts/internal/restapi"
 )
+
+// testVerifier returns an auth.Verifier backed by a freshly generated RSA
+// key, plus a Bearer token signed with that key carrying roles.
+func testVerifier(t *testing.T, roles ...string) (*auth.Verifier, string) {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	claims := jwt.MapClaims{
+		"sub":          "test-user-id",
+		"exp":          time.Now().Add(time.Hour).Unix(),
+		"realm_access": map[string]interface{}{"roles": roles},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	signed, err := token.SignedString(key)
+	if err != nil {
+		t.Fatalf("sign token: %v", err)
+	}
+	return auth.NewVerifierFromKey(&key.PublicKey), signed
+}
 
 // accountResponse mirrors restapi's unexported accountResponse shape so
 // tests can assert on the REST JSON contract (camelCase, string enums)
@@ -30,11 +57,13 @@ func TestHandlers_CreateAndGetAccount(t *testing.T) {
 	pool := setupTestDB(t)
 	repo := postgres.NewRepository(pool)
 	srv := grpcapi.NewServer(repo)
-	mux := restapi.NewMux(srv)
+	verifier, token := testVerifier(t, "admin")
+	mux := restapi.NewMux(srv, verifier)
 
 	createJSON := `{"customerId":"44444444-4444-4444-4444-444444444444",` +
 		`"type":"ACCOUNT_TYPE_SAVINGS","currencyCode":"USD"}`
 	req := httptest.NewRequest(http.MethodPost, "/accounts", strings.NewReader(createJSON))
+	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -59,6 +88,7 @@ func TestHandlers_CreateAndGetAccount(t *testing.T) {
 	}
 
 	getReq := httptest.NewRequest(http.MethodGet, "/accounts/"+created.ID, nil)
+	getReq.Header.Set("Authorization", "Bearer "+token)
 	getRec := httptest.NewRecorder()
 	mux.ServeHTTP(getRec, getReq)
 
@@ -78,11 +108,13 @@ func TestHandlers_CreateAccount_InvalidType_ReturnsProblemDetails(t *testing.T) 
 	pool := setupTestDB(t)
 	repo := postgres.NewRepository(pool)
 	srv := grpcapi.NewServer(repo)
-	mux := restapi.NewMux(srv)
+	verifier, token := testVerifier(t, "banker")
+	mux := restapi.NewMux(srv, verifier)
 
 	createJSON := `{"customerId":"55555555-5555-5555-5555-555555555555",` +
 		`"type":"NOT_A_REAL_TYPE","currencyCode":"USD"}`
 	req := httptest.NewRequest(http.MethodPost, "/accounts", strings.NewReader(createJSON))
+	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -105,9 +137,11 @@ func TestHandlers_GetAccount_NotFound_ReturnsProblemDetails(t *testing.T) {
 	pool := setupTestDB(t)
 	repo := postgres.NewRepository(pool)
 	srv := grpcapi.NewServer(repo)
-	mux := restapi.NewMux(srv)
+	verifier, token := testVerifier(t, "customer")
+	mux := restapi.NewMux(srv, verifier)
 
 	req := httptest.NewRequest(http.MethodGet, "/accounts/00000000-0000-0000-0000-000000000000", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 

@@ -20,10 +20,15 @@ import (
 	"google.golang.org/grpc"
 
 	accountsv1 "example.com/acmebank/proto/gen/go/acmebank/accounts/v1"
+	"example.com/acmebank/services/accounts/internal/auth"
 	"example.com/acmebank/services/accounts/internal/grpcapi"
 	"example.com/acmebank/services/accounts/internal/postgres"
 	"example.com/acmebank/services/accounts/internal/restapi"
 )
+
+// defaultJWKSURL points at the acme-bank realm's JWKS endpoint inside the
+// cluster, used when JWKS_URL is not set.
+const defaultJWKSURL = "http://keycloak.acme-platform.svc.cluster.local:8080/realms/acme-bank/protocol/openid-connect/certs"
 
 func main() {
 	ctx := context.Background()
@@ -49,6 +54,15 @@ func main() {
 	repo := postgres.NewRepository(pool)
 	server := grpcapi.NewServer(repo)
 
+	jwksURL := os.Getenv("JWKS_URL")
+	if jwksURL == "" {
+		jwksURL = defaultJWKSURL
+	}
+	verifier, err := auth.NewVerifier(jwksURL)
+	if err != nil {
+		log.Fatalf("create JWT verifier: %v", err)
+	}
+
 	go func() {
 		lis, err := net.Listen("tcp", ":9090")
 		if err != nil {
@@ -62,7 +76,7 @@ func main() {
 		}
 	}()
 
-	mux := restapi.NewMux(server)
+	mux := restapi.NewMux(server, verifier)
 	log.Println("HTTP server listening on :8080")
 	if err := http.ListenAndServe(":8080", otelhttp.NewHandler(mux, "accounts")); err != nil {
 		log.Fatalf("serve HTTP: %v", err)
