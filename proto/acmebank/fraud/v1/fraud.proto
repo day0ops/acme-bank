@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package acmebank.fraud.v1;
+
+import "acmebank/common/v1/money.proto";
+
+option go_package = "example.com/acmebank/proto/gen/go/acmebank/fraud/v1;fraudv1";
+option java_package = "io.acmebank.proto.fraud.v1";
+option java_multiple_files = true;
+
+// Published to the fraud.events topic when a transaction is flagged.
+message TransactionFlaggedEvent {
+  string transaction_id = 1;
+  string reason = 2;
+  acmebank.common.v1.Money amount = 3;
+}
