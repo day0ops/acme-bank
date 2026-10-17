@@ -7,6 +7,7 @@ import { AuthProvider } from '@/hooks/useAuth'
 import { LandingPage } from '@/pages/LandingPage'
 import { SandboxDashboardPage } from '@/pages/SandboxDashboardPage'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { BankerConsolePage } from '@/pages/BankerConsolePage'
 
 const queryClient = new QueryClient()
 
@@ -40,7 +41,14 @@ export function App() {
                   </RequireAuth>
                 }
               />
-              <Route path="/banker" element={<Placeholder title="Banker Console" />} />
+              <Route
+                path="/banker"
+                element={
+                  <RequireAuth roles={['banker', 'admin']}>
+                    <BankerConsolePage />
+                  </RequireAuth>
+                }
+              />
               <Route path="/admin" element={<Placeholder title="Admin Console" />} />
             </Route>
           </Routes>
