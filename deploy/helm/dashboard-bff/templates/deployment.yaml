@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard-bff
+  labels:
+    app: dashboard-bff
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: dashboard-bff
+  template:
+    metadata:
+      labels:
+        app: dashboard-bff
+    spec:
+      containers:
+        - name: dashboard-bff
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: CUSTOMERS_GRPC_ADDR
+              value: {{ .Values.env.customersGrpcAddr | quote }}
+            - name: ACCOUNTS_GRPC_ADDR
+              value: {{ .Values.env.accountsGrpcAddr | quote }}
+            - name: CARDS_GRPC_ADDR
+              value: {{ .Values.env.cardsGrpcAddr | quote }}
+            - name: TRANSACTIONS_GRPC_ADDR
+              value: {{ .Values.env.transactionsGrpcAddr | quote }}
+            - name: JWKS_URL
+              value: {{ .Values.env.jwksUrl | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.env.otelExporterEndpoint | quote }}

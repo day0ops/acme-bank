@@ -1,0 +1,5 @@
+apiVersion: v2
+name: dashboard-bff
+description: Dashboard BFF for Acme Bank
+version: 0.1.0
+appVersion: "0.1.0"
