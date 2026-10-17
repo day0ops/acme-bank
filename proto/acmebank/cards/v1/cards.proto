@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package acmebank.cards.v1;
+
+option go_package = "example.com/acmebank/proto/gen/go/acmebank/cards/v1;cardsv1";
+
+enum CardStatus {
+  CARD_STATUS_UNSPECIFIED = 0;
+  CARD_STATUS_ACTIVE = 1;
+  CARD_STATUS_FROZEN = 2;
+  CARD_STATUS_CLOSED = 3;
+}
+
+// Card never carries a full card number; only the last four digits, for
+// display purposes. See the service's Global Constraints.
+message Card {
+  string id = 1;
+  string account_id = 2;
+  string last_four = 3;
+  CardStatus status = 4;
+}
+
+message IssueCardRequest {
+  string account_id = 1;
+}
+
+message IssueCardResponse {
+  Card card = 1;
+}
+
+message GetCardRequest {
+  string id = 1;
+}
+
+message GetCardResponse {
+  Card card = 1;
+}
+
+message ListCardsByAccountRequest {
+  string account_id = 1;
+}
+
+message ListCardsByAccountResponse {
+  repeated Card cards = 1;
+}
+
+message FreezeCardRequest {
+  string id = 1;
+}
+
+message FreezeCardResponse {
+  Card card = 1;
+}
+
+message UnfreezeCardRequest {
+  string id = 1;
+}
+
+message UnfreezeCardResponse {
+  Card card = 1;
+}
+
+service CardsService {
+  rpc IssueCard(IssueCardRequest) returns (IssueCardResponse);
+  rpc GetCard(GetCardRequest) returns (GetCardResponse);
+  rpc ListCardsByAccount(ListCardsByAccountRequest) returns (ListCardsByAccountResponse);
+  rpc FreezeCard(FreezeCardRequest) returns (FreezeCardResponse);
+  rpc UnfreezeCard(UnfreezeCardRequest) returns (UnfreezeCardResponse);
+}
