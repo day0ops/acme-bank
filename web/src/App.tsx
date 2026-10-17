@@ -3,7 +3,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { RequireAuth } from '@/components/auth/RequireAuth'
-import { AuthProvider } from '@/hooks/useAuth'
+import { AuthProvider, useAuth } from '@/hooks/useAuth'
+import { useNotifications } from '@/hooks/useNotifications'
 import { LandingPage } from '@/pages/LandingPage'
 import { SandboxDashboardPage } from '@/pages/SandboxDashboardPage'
 import { DashboardPage } from '@/pages/DashboardPage'
@@ -21,6 +22,13 @@ function Placeholder({ title }: { title: string }) {
   return <h1 className="text-2xl font-bold">{title}</h1>
 }
 
+/** Bridges the authenticated token into `useNotifications`; renders nothing. */
+function LiveNotifications() {
+  const { token } = useAuth()
+  useNotifications(token)
+  return null
+}
+
 /** Application root: providers, router, and route table. */
 export function App() {
   return (
@@ -28,6 +36,7 @@ export function App() {
       <AuthProvider>
         <BrowserRouter>
           <Toaster richColors position="top-right" />
+          <LiveNotifications />
           <Routes>
             <Route element={<AppLayout />}>
               <Route path="/" element={<LandingPage />} />

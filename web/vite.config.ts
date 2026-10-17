@@ -15,6 +15,7 @@ export default defineConfig({
       '/api/cards': { target: 'http://localhost:8083', changeOrigin: true, rewrite: (path) => path.replace(/^\/api\/cards/, '') },
       '/api/transactions': { target: 'http://localhost:8084', changeOrigin: true, rewrite: (path) => path.replace(/^\/api\/transactions/, '') },
       '/api/dashboard': { target: 'http://localhost:8085', changeOrigin: true, rewrite: (path) => path.replace(/^\/api\/dashboard/, '/dashboard') },
+      '/api/notifications': { target: 'http://localhost:8086', changeOrigin: true, ws: true, rewrite: (path) => path.replace(/^\/api\/notifications/, '') },
     },
   },
   test: {

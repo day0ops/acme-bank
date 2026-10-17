@@ -112,3 +112,14 @@ export interface ProblemDetails {
   status: number
   detail?: string
 }
+
+// notifications/src/domain.rs Notification: #[serde(rename_all = "camelCase")]
+// on the struct, so the WebSocket payload is the full record below, not just
+// `{ message }` - id/eventType/transactionId/timestamp are always present too.
+export interface Notification {
+  id: string
+  eventType: string
+  transactionId: string
+  message: string
+  timestamp: number
+}
