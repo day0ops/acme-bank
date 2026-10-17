@@ -86,7 +86,8 @@ const file_acmebank_common_v1_money_proto_rawDesc = "" +
 	"\x05Money\x12#\n" +
 	"\rcurrency_code\x18\x01 \x01(\tR\fcurrencyCode\x12\x1f\n" +
 	"\vminor_units\x18\x02 \x01(\x03R\n" +
-	"minorUnitsB?Z=example.com/acmebank/proto/gen/go/acmebank/common/v1;commonv1b\x06proto3"
+	"minorUnitsB^\n" +
+	"\x1bio.acmebank.proto.common.v1P\x01Z=example.com/acmebank/proto/gen/go/acmebank/common/v1;commonv1b\x06proto3"
 
 var (
 	file_acmebank_common_v1_money_proto_rawDescOnce sync.Once
