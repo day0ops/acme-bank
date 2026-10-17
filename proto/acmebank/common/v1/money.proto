@@ -3,6 +3,8 @@ syntax = "proto3";
 package acmebank.common.v1;
 
 option go_package = "example.com/acmebank/proto/gen/go/acmebank/common/v1;commonv1";
+option java_package = "io.acmebank.proto.common.v1";
+option java_multiple_files = true;
 
 // Money represents a monetary amount using integer minor units
 // (e.g. cents) instead of a floating-point type, to avoid rounding
