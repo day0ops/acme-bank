@@ -1,6 +1,8 @@
 package io.acmebank.fraudrisk.observability;
 
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
+import io.opentelemetry.context.propagation.ContextPropagators;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.resources.Resource;
@@ -36,6 +38,12 @@ public class TracingConfig {
                 .setResource(resource)
                 .build();
 
-        return OpenTelemetrySdk.builder().setTracerProvider(tracerProvider).build();
+        // OpenTelemetrySdk defaults to a no-op ContextPropagators; without setting this
+        // explicitly, extracting traceparent from inbound Kafka headers would silently
+        // produce an empty context and every consumer span would be an orphaned root.
+        return OpenTelemetrySdk.builder()
+                .setTracerProvider(tracerProvider)
+                .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
+                .build();
     }
 }

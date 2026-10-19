@@ -61,6 +61,7 @@ dependencies {
     // same rationale as Transactions' OutboxRelayTest.
     testImplementation("org.testcontainers:redpanda:1.20.2")
     testImplementation("org.awaitility:awaitility:4.2.2")
+    testImplementation("io.opentelemetry:opentelemetry-sdk-testing:$otelVersion")
     testImplementation("io.grpc:grpc-testing:$grpcVersion")
     testImplementation("io.grpc:grpc-inprocess:$grpcVersion")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
