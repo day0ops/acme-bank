@@ -40,3 +40,82 @@ jobs:
       - name: Vet
         working-directory: proto/gen/go
         run: go vet ./...
+
+  go-services:
+    name: Go services (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [accounts, dashboard-bff]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+      - name: Build
+        working-directory: services/${{ matrix.service }}
+        run: go build ./...
+      - name: Test
+        working-directory: services/${{ matrix.service }}
+        run: go test ./...
+      - name: Vet
+        working-directory: services/${{ matrix.service }}
+        run: go vet ./...
+
+  java-services:
+    name: Java services (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [customers, transactions, fraud-risk]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Test
+        working-directory: services/${{ matrix.service }}
+        run: ./gradlew test
+
+  rust-services:
+    name: Rust services (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [cards, notifications]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.90.0
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            services/${{ matrix.service }}/target
+          key: ${{ runner.os }}-cargo-${{ matrix.service }}-${{ hashFiles(format('services/{0}/Cargo.lock', matrix.service)) }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.service }}-
+      - name: Test
+        working-directory: services/${{ matrix.service }}
+        run: cargo test
+
+  web:
+    name: Web UI tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+      # auth.test.ts makes a real password-grant call against a live Keycloak
+      # instance on localhost:18080 (see web/src/lib/auth.test.ts) - excluded
+      # here for the same reason as web/e2e: no Keycloak container in this CI.
+      - name: Test
+        working-directory: web
+        run: npm test -- --exclude src/lib/auth.test.ts
