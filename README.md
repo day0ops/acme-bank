@@ -18,9 +18,15 @@ kgateway. Full architecture: [docs/architecture.md](docs/architecture.md).
 - `services/` - one directory per microservice (Java, Go, Rust)
 - `web/` - React + TypeScript UI
 - `proto/` - shared Protobuf contracts (gRPC + event schemas)
-- `platform/` - Keycloak, Redpanda, observability, and gateway configuration
-- `deploy/helm/` - Helm charts for deployment
+- `platform/` - Keycloak realm config and Kubernetes manifests (namespaces,
+  Gateway/HTTPRoutes, AuthorizationPolicy)
+- `deploy/helm/` - per-service Helm charts; `deploy/scripts/` - local kind +
+  Istio ambient mesh + kgateway bring-up
 
 ## Getting started
 
-Run `make help` to see available commands.
+Run `make help` to see available commands, or `make cluster-up` to bring up a
+local kind cluster with the ambient mesh, kgateway, and routing scaffolding.
+
+See [docs/architecture.md](docs/architecture.md#known-gaps-not-yet-implemented)
+for what's built versus what's still a known gap.
