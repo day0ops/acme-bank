@@ -6,6 +6,7 @@
 //! `"banker"`), so role checks here only ever need literal membership
 //! testing - no special-casing of `admin` as a superset.
 
+use crate::problem::problem_response;
 use axum::extract::Request;
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::middleware::Next;
@@ -54,8 +55,12 @@ impl std::error::Error for AuthError {}
 impl IntoResponse for AuthError {
     fn into_response(self) -> Response {
         match self {
-            AuthError::InvalidToken => StatusCode::UNAUTHORIZED.into_response(),
-            AuthError::MissingRole => StatusCode::FORBIDDEN.into_response(),
+            AuthError::InvalidToken => {
+                problem_response(StatusCode::UNAUTHORIZED, "Unauthorized", self.to_string())
+            }
+            AuthError::MissingRole => {
+                problem_response(StatusCode::FORBIDDEN, "Forbidden", self.to_string())
+            }
             AuthError::JwksFetchFailed(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         }
     }

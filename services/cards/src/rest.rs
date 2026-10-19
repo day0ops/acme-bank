@@ -1,5 +1,6 @@
 use crate::auth::{self, Verifier};
 use crate::grpc::CardsGrpcService;
+use crate::problem::problem_response;
 use crate::proto::acmebank::cards::v1::cards_service_server::CardsService as _;
 use crate::proto::acmebank::cards::v1::{
     FreezeCardRequest, GetCardRequest, IssueCardRequest, ListCardsByAccountRequest,
@@ -21,30 +22,6 @@ const BANKER_OR_ADMIN: &[&str] = &["banker", "admin"];
 /// Empty slice: `auth::require_role` treats this as "any authenticated
 /// caller" - a validated token is enough, no specific role is required.
 const ANY_AUTHENTICATED: &[&str] = &[];
-
-/// RFC 9457 Problem Details body.
-#[derive(Serialize)]
-struct Problem {
-    #[serde(rename = "type")]
-    problem_type: String,
-    title: String,
-    status: u16,
-    detail: String,
-}
-
-fn problem_response(status: StatusCode, title: &str, detail: String) -> Response {
-    let body = Problem {
-        problem_type: "about:blank".to_string(),
-        title: title.to_string(),
-        status: status.as_u16(),
-        detail,
-    };
-    let mut response = (status, Json(body)).into_response();
-    response
-        .headers_mut()
-        .insert("content-type", "application/problem+json".parse().unwrap());
-    response
-}
 
 /// Maps a gRPC status from the in-process `CardsGrpcService` to Problem Details.
 /// `FailedPrecondition` (e.g. freezing/unfreezing a closed card, per the Task 3
@@ -566,6 +543,15 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            response.headers().get("content-type").unwrap(),
+            "application/problem+json"
+        );
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let problem: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(problem["status"], 401);
     }
 
     #[tokio::test]
@@ -586,5 +572,14 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        assert_eq!(
+            response.headers().get("content-type").unwrap(),
+            "application/problem+json"
+        );
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let problem: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(problem["status"], 403);
     }
 }

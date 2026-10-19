@@ -1,4 +1,5 @@
 use crate::auth::Verifier;
+use crate::problem::problem_response;
 use crate::store::NotificationStore;
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{Query, State, WebSocketUpgrade};
@@ -31,10 +32,20 @@ pub fn router(store: Arc<NotificationStore>, verifier: Arc<Verifier>) -> Router 
 async fn list_notifications(State(state): State<AppState>, headers: HeaderMap) -> Response {
     let token = match extract_bearer(&headers) {
         Some(t) => t,
-        None => return StatusCode::UNAUTHORIZED.into_response(),
+        None => {
+            return problem_response(
+                StatusCode::UNAUTHORIZED,
+                "Unauthorized",
+                "invalid or missing bearer token".to_string(),
+            )
+        }
     };
     if state.verifier.validate(&token).is_err() {
-        return StatusCode::UNAUTHORIZED.into_response();
+        return problem_response(
+            StatusCode::UNAUTHORIZED,
+            "Unauthorized",
+            "invalid or missing bearer token".to_string(),
+        );
     }
     Json(state.store.recent()).into_response()
 }
@@ -55,10 +66,20 @@ async fn websocket_handler(
 ) -> Response {
     let token = match params.get("token") {
         Some(t) => t.clone(),
-        None => return StatusCode::UNAUTHORIZED.into_response(),
+        None => {
+            return problem_response(
+                StatusCode::UNAUTHORIZED,
+                "Unauthorized",
+                "invalid or missing bearer token".to_string(),
+            )
+        }
     };
     if state.verifier.validate(&token).is_err() {
-        return StatusCode::UNAUTHORIZED.into_response();
+        return problem_response(
+            StatusCode::UNAUTHORIZED,
+            "Unauthorized",
+            "invalid or missing bearer token".to_string(),
+        );
     }
     ws.on_upgrade(move |socket| handle_socket(socket, state))
 }
@@ -142,5 +163,40 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            response.headers().get("content-type").unwrap(),
+            "application/problem+json"
+        );
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let problem: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(problem["status"], 401);
+    }
+
+    #[tokio::test]
+    async fn get_notifications_with_invalid_token_returns_401() {
+        let keys = TestKeyPair::generate();
+        let other_keys = TestKeyPair::generate();
+        let token = other_keys.sign(&["customer"]);
+        let verifier = Arc::new(Verifier::from_key(keys.decoding_key));
+        let store = Arc::new(NotificationStore::new());
+        let app = router(store, verifier);
+
+        let response = app
+            .oneshot(
+                HttpRequest::get("/notifications")
+                    .header("Authorization", format!("Bearer {token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            response.headers().get("content-type").unwrap(),
+            "application/problem+json"
+        );
     }
 }

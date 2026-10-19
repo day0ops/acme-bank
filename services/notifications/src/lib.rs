@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod consumer;
 pub mod domain;
+pub mod problem;
 pub mod rest;
 pub mod store;
 pub mod telemetry;
