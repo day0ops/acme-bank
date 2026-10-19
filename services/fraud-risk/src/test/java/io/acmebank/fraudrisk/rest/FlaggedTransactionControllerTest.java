@@ -89,13 +89,17 @@ class FlaggedTransactionControllerTest {
     @Test
     void getFlaggedTransactions_withoutToken_returns401() throws Exception {
         mockMvc.perform(get("/flagged-transactions"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentType("application/problem+json"))
+                .andExpect(jsonPath("$.status").value(401));
     }
 
     @Test
     void getFlaggedTransactions_withCustomerToken_returns403() throws Exception {
         mockMvc.perform(get("/flagged-transactions")
                         .header("Authorization", "Bearer " + signTestToken(java.util.List.of("customer"))))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentType("application/problem+json"))
+                .andExpect(jsonPath("$.status").value(403));
     }
 }

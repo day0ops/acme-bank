@@ -1,6 +1,9 @@
 spring:
   application:
     name: fraud-risk
+  mvc:
+    problemdetails:
+      enabled: true
   security:
     oauth2:
       resourceserver:

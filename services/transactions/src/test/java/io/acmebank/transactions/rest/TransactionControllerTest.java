@@ -107,6 +107,8 @@ class TransactionControllerTest {
             """;
 
         mockMvc.perform(post("/transactions").contentType("application/json").content(transferBody))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentType("application/problem+json"))
+                .andExpect(jsonPath("$.status").value(401));
     }
 }

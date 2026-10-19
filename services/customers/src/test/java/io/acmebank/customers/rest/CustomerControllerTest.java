@@ -185,7 +185,9 @@ class CustomerControllerTest {
             """;
 
         mockMvc.perform(post("/customers").contentType("application/json").content(createBody))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentType("application/problem+json"))
+                .andExpect(jsonPath("$.status").value(401));
     }
 
     @Test
@@ -197,6 +199,8 @@ class CustomerControllerTest {
         mockMvc.perform(post("/customers")
                         .header("Authorization", "Bearer " + customerToken())
                         .contentType("application/json").content(createBody))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentType("application/problem+json"))
+                .andExpect(jsonPath("$.status").value(403));
     }
 }
