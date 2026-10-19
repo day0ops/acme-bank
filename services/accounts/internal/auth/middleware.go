@@ -26,16 +26,16 @@ func RequireRole(verifier *Verifier, roles ...string) func(http.Handler) http.Ha
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			tokenString, ok := bearerToken(r)
 			if !ok {
-				w.WriteHeader(http.StatusUnauthorized)
+				writeProblem(w, http.StatusUnauthorized, "Unauthorized", "missing or invalid bearer token")
 				return
 			}
 			claims, err := verifier.Validate(tokenString)
 			if err != nil {
-				w.WriteHeader(http.StatusUnauthorized)
+				writeProblem(w, http.StatusUnauthorized, "Unauthorized", "missing or invalid bearer token")
 				return
 			}
 			if !hasAnyRole(claims.Roles, allowed) {
-				w.WriteHeader(http.StatusForbidden)
+				writeProblem(w, http.StatusForbidden, "Forbidden", "caller lacks a required role")
 				return
 			}
 			ctx := context.WithValue(r.Context(), claimsContextKey, claims)

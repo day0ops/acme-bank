@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -49,6 +50,7 @@ func TestRequireRole_MissingRequiredRole_Returns403(t *testing.T) {
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("got status %d, want 403", rec.Code)
 	}
+	assertProblemDetails(t, rec, http.StatusForbidden)
 }
 
 func TestRequireRole_MissingToken_Returns401(t *testing.T) {
@@ -65,5 +67,23 @@ func TestRequireRole_MissingToken_Returns401(t *testing.T) {
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("got status %d, want 401", rec.Code)
+	}
+	assertProblemDetails(t, rec, http.StatusUnauthorized)
+}
+
+// assertProblemDetails checks that rec carries an RFC 9457 Problem Details
+// body matching wantStatus: application/problem+json content type and a
+// "status" field equal to the HTTP status code.
+func assertProblemDetails(t *testing.T, rec *httptest.ResponseRecorder, wantStatus int) {
+	t.Helper()
+	if ct := rec.Header().Get("Content-Type"); ct != "application/problem+json" {
+		t.Fatalf("got Content-Type %q, want application/problem+json", ct)
+	}
+	var body problem
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode problem details body: %v", err)
+	}
+	if body.Status != wantStatus {
+		t.Fatalf("got problem status %d, want %d", body.Status, wantStatus)
 	}
 }
