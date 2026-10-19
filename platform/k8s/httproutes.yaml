@@ -1,0 +1,120 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: web-ui
+  namespace: acme-bank
+spec:
+  parentRefs:
+    - name: acme-bank-gateway
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: / }
+      backendRefs:
+        - name: web
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: customers-api
+  namespace: acme-bank
+spec:
+  parentRefs:
+    - name: acme-bank-gateway
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /api/customers }
+      backendRefs:
+        - name: customers
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: accounts-api
+  namespace: acme-bank
+spec:
+  parentRefs:
+    - name: acme-bank-gateway
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /api/accounts }
+      backendRefs:
+        - name: accounts
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: cards-api
+  namespace: acme-bank
+spec:
+  parentRefs:
+    - name: acme-bank-gateway
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /api/cards }
+      backendRefs:
+        - name: cards
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: transactions-api
+  namespace: acme-bank
+spec:
+  parentRefs:
+    - name: acme-bank-gateway
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /api/transactions }
+      backendRefs:
+        - name: transactions
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: dashboard-api
+  namespace: acme-bank
+spec:
+  parentRefs:
+    - name: acme-bank-gateway
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /api/dashboard }
+      backendRefs:
+        - name: dashboard-bff
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: notifications-api
+  namespace: acme-bank
+spec:
+  parentRefs:
+    - name: acme-bank-gateway
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /api/notifications }
+      backendRefs:
+        - name: notifications
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: keycloak
+  namespace: acme-platform
+spec:
+  parentRefs:
+    - name: acme-bank-gateway
+      namespace: acme-bank
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /realms }
+      backendRefs:
+        - name: keycloak
+          port: 8080
