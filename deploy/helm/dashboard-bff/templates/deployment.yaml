@@ -14,6 +14,7 @@ spec:
       labels:
         app: dashboard-bff
     spec:
+      serviceAccountName: dashboard-bff
       containers:
         - name: dashboard-bff
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

@@ -1,4 +1,4 @@
-.PHONY: help tools proto-lint proto-gen
+.PHONY: help tools proto-lint proto-gen cluster-up
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -11,3 +11,6 @@ proto-lint: ## Lint the shared Protobuf contracts
 
 proto-gen: ## Generate Go code from the shared Protobuf contracts
 	cd proto && buf generate
+
+cluster-up: ## Bring up a local kind cluster with ambient mesh, kgateway, and routing
+	./deploy/scripts/bring-up.sh

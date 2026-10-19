@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: accounts-postgres
+  namespace: acme-bank
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: accounts-postgres }
+  template:
+    metadata:
+      labels: { app: accounts-postgres }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - { name: POSTGRES_USER, value: "accounts" }
+            - { name: POSTGRES_PASSWORD, value: "accounts" }
+            - { name: POSTGRES_DB, value: "accounts" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: accounts-postgres
+  namespace: acme-bank
+spec:
+  selector: { app: accounts-postgres }
+  ports:
+    - port: 5432
+      targetPort: 5432

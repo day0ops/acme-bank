@@ -1,0 +1,23 @@
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: accounts-grpc-allow-dashboard-bff
+  namespace: acme-bank
+spec:
+  selector:
+    matchLabels:
+      app: accounts
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals: ["cluster.local/ns/acme-bank/sa/dashboard-bff"]
+      to:
+        - operation:
+            ports: ["9090"]
+    # Any ALLOW policy selecting a workload makes Istio deny everything else
+    # to that workload by default, so the public REST port needs its own
+    # explicit allow-all rule or kgateway itself gets locked out of it too.
+    - to:
+        - operation:
+            ports: ["8080"]
