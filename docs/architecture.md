@@ -121,6 +121,7 @@ guest access matters beyond a generic marketing page:
 - `/api/customers/*`, `/api/accounts/*`, `/api/transactions/*`,
   `/api/cards/*` → respective service (direct CRUD)
 - `/api/dashboard` → Dashboard BFF (composite view)
+- `/api/notifications` → Notifications (live WebSocket/REST feed for the UI)
 - `/admin/*` → same services, routes tagged with a JWT role check
   (banker/admin only)
 - Keycloak exposed on its own route for the login/token flow
