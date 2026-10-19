@@ -12,6 +12,13 @@ use tracing_subscriber::util::SubscriberInitExt;
 /// Spans are batch-exported on the Tokio runtime and tagged with a
 /// `service.name` of "notifications" so the collector can attribute them correctly.
 pub fn init_tracing() {
+    // Without this, the global propagator defaults to a no-op, and extracting
+    // `traceparent` from inbound Kafka headers silently yields an empty context -
+    // consumer spans would look fine but never actually parent to the producer's trace.
+    opentelemetry::global::set_text_map_propagator(
+        opentelemetry_sdk::propagation::TraceContextPropagator::new(),
+    );
+
     let endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
         .unwrap_or_else(|_| "http://localhost:4317".to_string());
 
