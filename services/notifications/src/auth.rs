@@ -111,7 +111,12 @@ impl Verifier {
     /// Validates `token`'s signature and expiry, returning its subject and
     /// effective (composite-expanded) realm roles.
     pub fn validate(&self, token: &str) -> Result<Claims, AuthError> {
-        let validation = Validation::new(Algorithm::RS256);
+        let mut validation = Validation::new(Algorithm::RS256);
+        // Keycloak's default "audience resolve" mapper adds an `aud` claim,
+        // but this service (like Go/Java's validators) doesn't check it -
+        // without this, jsonwebtoken's default `validate_aud = true` would
+        // reject otherwise-legitimate tokens that happen to carry one.
+        validation.validate_aud = false;
         let data = decode::<RawClaims>(token, &self.decoding_key, &validation)
             .map_err(|_| AuthError::InvalidToken)?;
         Ok(Claims {
@@ -214,6 +219,32 @@ pub(crate) mod test_support {
             };
             encode(&Header::new(Algorithm::RS256), &claims, &self.encoding_key).unwrap()
         }
+
+        /// Signs a token like `sign`, but also carrying an `aud` claim, as
+        /// Keycloak's default "audience resolve" mapper does.
+        pub(crate) fn sign_with_audience(&self, roles: &[&str], aud: &str) -> String {
+            #[derive(Serialize)]
+            struct ClaimsWithAudience {
+                sub: String,
+                exp: usize,
+                realm_access: RealmAccess,
+                aud: String,
+            }
+
+            let claims = ClaimsWithAudience {
+                sub: "test-user-id".to_string(),
+                exp: (std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs()
+                    + 3600) as usize,
+                realm_access: RealmAccess {
+                    roles: roles.iter().map(|role| role.to_string()).collect(),
+                },
+                aud: aud.to_string(),
+            };
+            encode(&Header::new(Algorithm::RS256), &claims, &self.encoding_key).unwrap()
+        }
     }
 }
 
@@ -242,5 +273,20 @@ mod tests {
         let verifier = Verifier::from_key(other_keys.decoding_key);
 
         assert!(verifier.validate(&token).is_err());
+    }
+
+    #[test]
+    fn validate_token_with_audience_claim_succeeds() {
+        // Keycloak's default "audience resolve" mapper adds an `aud` claim.
+        // This service doesn't check audience (matching Go/Java), so such
+        // tokens must still be accepted.
+        let keys = TestKeyPair::generate();
+        let token = keys.sign_with_audience(&["customer"], "acme-bank-web");
+        let verifier = Verifier::from_key(keys.decoding_key);
+
+        let claims = verifier.validate(&token).unwrap();
+
+        assert_eq!(claims.subject, "test-user-id");
+        assert_eq!(claims.roles, vec!["customer"]);
     }
 }
