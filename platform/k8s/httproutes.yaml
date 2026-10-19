@@ -24,6 +24,10 @@ spec:
   rules:
     - matches:
         - path: { type: PathPrefix, value: /api/customers }
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path: { type: ReplacePrefixMatch, replacePrefixMatch: /customers }
       backendRefs:
         - name: customers
           port: 8080
@@ -39,6 +43,10 @@ spec:
   rules:
     - matches:
         - path: { type: PathPrefix, value: /api/accounts }
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path: { type: ReplacePrefixMatch, replacePrefixMatch: /accounts }
       backendRefs:
         - name: accounts
           port: 8080
@@ -54,6 +62,10 @@ spec:
   rules:
     - matches:
         - path: { type: PathPrefix, value: /api/cards }
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path: { type: ReplacePrefixMatch, replacePrefixMatch: /cards }
       backendRefs:
         - name: cards
           port: 8080
@@ -69,6 +81,10 @@ spec:
   rules:
     - matches:
         - path: { type: PathPrefix, value: /api/transactions }
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path: { type: ReplacePrefixMatch, replacePrefixMatch: /transactions }
       backendRefs:
         - name: transactions
           port: 8080
@@ -84,6 +100,10 @@ spec:
   rules:
     - matches:
         - path: { type: PathPrefix, value: /api/dashboard }
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path: { type: ReplacePrefixMatch, replacePrefixMatch: /dashboard }
       backendRefs:
         - name: dashboard-bff
           port: 8080
@@ -99,6 +119,10 @@ spec:
   rules:
     - matches:
         - path: { type: PathPrefix, value: /api/notifications }
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path: { type: ReplacePrefixMatch, replacePrefixMatch: /notifications }
       backendRefs:
         - name: notifications
           port: 8080
