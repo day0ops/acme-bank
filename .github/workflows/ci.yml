@@ -19,8 +19,12 @@ jobs:
         run: buf lint
       - name: Breaking change check
         if: github.event_name == 'pull_request'
-        working-directory: proto
-        run: buf breaking --against '.git#branch=main,subdir=proto'
+        run: |
+          # actions/checkout@v4 leaves HEAD detached on a PR event with no
+          # local 'main' branch, only origin/main - buf's git input needs an
+          # actual local branch ref to clone/checkout against.
+          git fetch origin main:main
+          cd proto && buf breaking --against '../.git#branch=main,subdir=proto'
 
   go:
     name: Go build & test
@@ -45,6 +49,7 @@ jobs:
     name: Go services (${{ matrix.service }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         service: [accounts, dashboard-bff]
     steps:
@@ -66,6 +71,7 @@ jobs:
     name: Java services (${{ matrix.service }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         service: [customers, transactions, fraud-risk]
     steps:
@@ -82,11 +88,14 @@ jobs:
     name: Rust services (${{ matrix.service }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         service: [cards, notifications]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.90.0
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - uses: actions/cache@v4
         with:
           path: |

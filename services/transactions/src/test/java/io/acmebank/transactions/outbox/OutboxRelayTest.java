@@ -75,9 +75,18 @@ class OutboxRelayTest {
 
         try (KafkaConsumer<String, byte[]> consumer = new KafkaConsumer<>(consumerProps)) {
             consumer.subscribe(java.util.List.of("transactions.events"));
-            ConsumerRecords<String, byte[]> records = consumer.poll(Duration.ofSeconds(10));
-            assertEquals(1, records.count());
-            ConsumerRecord<String, byte[]> record = records.iterator().next();
+            // A single poll() call right after subscribe() can return zero records even
+            // though the broker has the message - the first poll may only complete the
+            // consumer group's partition assignment, with the actual fetch landing on a
+            // later poll. Loop until a record arrives or the deadline passes, instead of
+            // asserting on one poll call, to avoid flaking under CI's slower scheduling.
+            java.util.List<ConsumerRecord<String, byte[]>> polled = new java.util.ArrayList<>();
+            long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
+            while (polled.isEmpty() && System.nanoTime() < deadline) {
+                consumer.poll(Duration.ofSeconds(2)).forEach(polled::add);
+            }
+            assertEquals(1, polled.size());
+            ConsumerRecord<String, byte[]> record = polled.get(0);
             assertEquals("test-payload", new String(record.value()));
             assertEquals("TransactionCompleted", new String(record.headers().lastHeader("event-type").value()));
             // Must be a well-formed W3C traceparent, not just present: an empty-but-present
