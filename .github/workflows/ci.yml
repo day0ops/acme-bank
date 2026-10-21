@@ -20,7 +20,7 @@ jobs:
       - name: Breaking change check
         if: github.event_name == 'pull_request'
         working-directory: proto
-        run: buf breaking --against '.git#branch=main,subdir=proto'
+        run: buf breaking --against '../.git#branch=main,subdir=proto'
 
   go:
     name: Go build & test
