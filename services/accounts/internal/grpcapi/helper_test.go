@@ -3,6 +3,7 @@ package grpcapi_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/testcontainers/testcontainers-go"
@@ -22,7 +23,12 @@ func setupTestDB(t *testing.T) *pgxpool.Pool {
 			"POSTGRES_PASSWORD": "test",
 			"POSTGRES_DB":       "accounts",
 		},
-		WaitingFor: wait.ForListeningPort("5432/tcp"),
+		// The official postgres image logs this line twice: once for the
+		// temporary initdb instance, once for the real long-running one. A
+		// plain port-open check races the restart between those two and can
+		// connect while the first instance is still shutting down.
+		WaitingFor: wait.ForLog("database system is ready to accept connections").
+			WithOccurrence(2).WithStartupTimeout(60 * time.Second),
 	}
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
